@@ -1,10 +1,11 @@
 [build-system]
-requires = ["setuptools>=80"]
-build-backend = "setuptools.build_meta"
+requires = ["setuptools>=83.0.0", "wheel", "python-decouple>=3.8"]
+build-backend = "build"
+backend-path = ["."]
 
 [project]
 name = "deltakit-visualise"
-version = "0.2.0"
+version = "0.3.0"
 description = "Deltakit (component deltakit-visualise)"
 readme = "README.md"
 requires-python = ">=3.10, <3.15"
@@ -17,6 +18,8 @@ classifiers = [
   "Development Status :: 1 - Planning",
   "Intended Audience :: Science/Research",
   "Intended Audience :: Developers",
+  "Intended Audience :: Education",
+  "Intended Audience :: End Users/Desktop",
   "Operating System :: OS Independent",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
@@ -26,11 +29,28 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
+  "Programming Language :: JavaScript",
   "Topic :: Scientific/Engineering :: Quantum Computing",
+  "Topic :: Multimedia :: Graphics :: Viewers",
+  "Topic :: Scientific/Engineering :: Visualization",
+  "Topic :: Software Development :: Compilers",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Software Development :: User Interfaces",
   "Typing :: Typed",
 ]
 
-dependencies = []
+dependencies = [
+  "platformdirs>=4.10.0,<5",
+  "deltakit-compile>=0.7,<0.8",
+  "typing_extensions >=4.15, <5",
+  "xdsl>=0.66,<0.67",
+  # Required by utils.notebook for the in-cell "Open link" button. It is imported
+  # dynamically, so deptry cannot see it (see tool.deptry.per_rule_ignores below).
+  # ipywidgets pulls in ipython; ipykernel is provided by whatever runs the kernel.
+  "ipywidgets>=8,<9",
+  "fastapi>=0.140.7",
+  "uvicorn>=0.51.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/Deltakit/deltakit"
@@ -39,31 +59,37 @@ Changelog = "https://github.com/Deltakit/deltakit/releases"
 
 [dependency-groups]
 test = [
-  "numpy >=1.25, <3",
-  "numpy >=1.26, <3; python_version >= '3.12'",
-  "numpy >=2.1, <3; python_version >= '3.13'",
-  "numpy >=2.3.4, <3; python_version >= '3.14'",
-  "pytest >=9.0, <10",
-  "pytest-cov >=7, <8",
-  "pytest-skip-slow>=0.0.5,<1.2",
-  "coverage >=7.7.0, <8",
-  "pytest-mock>=3.14",
-  "pytest-lazy-fixtures>=1.0",
+  "pytest>=9.0.3,<10",
+  "pytest-cov>=7.1.0,<8",
+  "filecheck >=1.0.3, <2",
+  "lit >=18.1.8, <19",
+  "coverage>=7.15.2,<8",
+  "httpx2>=2.9.0,<3",
 ]
+
 lint = [
-  "mypy>=1.17,<3.0",
-  "ruff==0.16.0",
-  "typos >=1.34, <2",
-  "deptry>=0.23,<0.26",
-  "pydoclint>=0.9,<0.10",
+  "mypy>=2.1.0,<3",
+  "ruff==0.15.22",
+  "typos>=1.46.3,<2",
+  "deptry>=0.25.1,<0.26",
+  "pydoclint>=0.9.1,<0.10",
 ]
-security = ["bandit[toml] >=1.8, <2", "pip-audit >=2.7, <3"]
+security = ["bandit[toml]>=1.9.4,<2", "pip-audit>=2.10.1,<3"]
+# Needed to run the tutorial notebooks against this venv as the kernel. Not a package
+# dependency: end users get a kernel from whatever runs their notebook.
+notebook = ["ipykernel>=6,<8"]
 dev = [
   { include-group = "test" },
   { include-group = "lint" },
   { include-group = "security" },
-  "pre-commit >=4.2, <5",
-  "validate-pyproject >=0.24.1,<0.26",
+  { include-group = "notebook" },
+  "pre-commit>=4.6.0,<5",
+  "validate-pyproject>=0.25,<0.26",
+  # Read by the build backend (build.py, also listed in [build-system].requires) and by
+  # dev_setup.py. The runtime package never imports it, so it is not a project dependency.
+  "python-decouple>=3.8,<4",
+  "setuptools>=83.0.0,<84",
+  "types-setuptools>=83.0.0,<84",
 ]
 release = [
   "python-semantic-release >=10.6.1, <11",
@@ -75,26 +101,12 @@ release = [
 [tool.deptry]
 known_first_party = ["deltakit_visualise"]
 
-[tool.mypy]
-files = "src/**/*.py"
-
-[tool.pytest.ini_options]
-testpaths = ["./tests/"]
-
-[tool.pydoclint]
-style = 'google'
-exclude = '\.git|\.venv.*'
-# We do not want type hints to be duplicated in docstrings.
-arg-type-hints-in-docstring = false
-check-return-types = false
-check-yield-types = false
-# Ensure that Google style is used
-check-style-mismatch = true
-# Short docstrings are an open door for circumventing the linter.
-skip-checking-short-docstrings = false
-# For the moment, we have a baseline of documentation format errors. Eventually, this will
-# be removed.
-baseline = ".pydoclint_baseline.txt"
+[tool.deptry.per_rule_ignores]
+# setuptools is a build-system dependency, listed in [build-system].requires
+DEP004 = ["setuptools"]
+# ipywidgets is imported lazily via import_module in utils/notebook.py, so deptry's
+# static analysis cannot see the usage.
+DEP002 = ["ipywidgets"]
 
 [tool.typos.default]
 locale = 'en-gb'
@@ -119,15 +131,15 @@ Alise = "Alise"
 DEPOLARIZE = "DEPOLARIZE"
 depolarization = "depolarization"
 depolarizing = "depolarizing"
-Authorization = "Authorization"   # Web-related field.
-color = "color"                   # Used in matplotlib and stim APIs.
+Authorization = "Authorization"   # Web-related field.
+color = "color"                   # Used in matplotlib and stim APIs.
 colors = "colors"
-optimize = "optimize"             # scipy.optimize
-ax = "ax"                         # Typical naming for matplotlib Axes instances.
+optimize = "optimize"             # scipy.optimize
+ax = "ax"                         # Typical naming for matplotlib Axes instances.
 center = "center"
 stabilizer = "stabilizer"
 stabilizers = "stabilizers"
-synchronize = "synchronize"       # multiprocessing import
+synchronize = "synchronize"       # multiprocessing import
 neighbors = "neighbors"
 capitalize = "capitalize"
 labeled = "labeled"
@@ -141,3 +153,38 @@ Normalize = "Normalize"
 [tool.typos.files]
 # Paths/patterns to exclude from spell checking
 extend-exclude = ["**/LICENSE", "**/*.html"]
+
+[tool.bandit]
+exclude_dirs = ['.github', '.tox', '.venv', '**/lit.cfg.py']
+skips = [
+  'B101',
+  'B311',
+] # B101 is just use of `assert`; 'B311' is use of random module
+
+[tool.mypy]
+files = ["src/**/*.py"]
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["./tests/"]
+
+[tool.pydoclint]
+style = 'google'
+exclude = '\.git|\.venv.*'
+# We do not want type hints to be duplicated in docstrings.
+arg-type-hints-in-docstring = false
+check-return-types = false
+check-yield-types = false
+# Ensure that Google style is used
+check-style-mismatch = true
+# Empty yields or returns do not have to be documented.
+require-yield-section-when-yielding-nothing = false
+require-return-section-when-returning-nothing = false
+# The raise checks are oddly restrictive - forcing us to document exceptions in the function
+# body and nothing more.
+skip-checking-raises = true
+
+[tool.setuptools.package-data]
+# Keep the .js glob narrow: it is populated by build.py from an npm tarball, and a
+# broad glob would sweep in anything else that lands in that directory.
+deltakit_visualise = ["assets/**/*", ".js/dist/*.js"]
