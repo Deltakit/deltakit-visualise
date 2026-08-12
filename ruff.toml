@@ -42,7 +42,7 @@ exclude = [
     "site-packages",
     "venv",
     "_version.py",
-    # Specific to dkit-visualise
+    # Specific to deltakit-visualise
     "tests/filecheck/lit.cfg.py",
 ]
 

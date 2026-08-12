@@ -1,0 +1,12 @@
+-2.290320e-02 primitives/surface_code_2d.mlir
+-7.570720e-01 extended/cnot.mlir
+-8.021030e-01 extended/cnot_no_name_hints.mlir
+-7.829518e-01 extended/cnot_parallel.mlir
+-7.650001e-01 extended/qmem.mlir
+-7.897689e-01 primitives/declare.mlir
+-7.548077e-01 primitives/meas_stab.mlir
+-7.922177e-01 primitives/measure.mlir
+-7.822950e-01 primitives/multi_pauli_meas.mlir
+-7.860999e-01 primitives/prepare.mlir
+-2.677703e-02 primitives/surface_code_repeat.mlir
+-3.450489e-02 primitives/surface_code_simple.mlir
