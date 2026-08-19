@@ -180,7 +180,6 @@ class LogicalAssemblyVisualiser:
             ctx, module_copy_for_spacetime
         )
         module_copy_for_spacetime.verify()
-
         space_time_data = get_visualisation_data(module_copy_for_spacetime)
 
         module_copy_for_logical_patches = self.module.clone()
@@ -188,7 +187,6 @@ class LogicalAssemblyVisualiser:
             ctx, module_copy_for_logical_patches
         )
         module_copy_for_logical_patches.verify()
-
         logical_patches_data = get_visualisation_data(module_copy_for_logical_patches)
 
         app = create_app(
