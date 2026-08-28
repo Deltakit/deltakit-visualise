@@ -42,9 +42,7 @@ class TestVisualiseLogicalPatch:
         assert len(calls) == 1
         assert calls[0] == (p, 1)
 
-    def test_two_patches_produce_different_visualisations(
-        self, monkeypatch, builder_and_patch
-    ):
+    def test_two_patches_produce_different_visualisations(self, monkeypatch, builder_and_patch):
         """Calling the utility for two different patches yields different data."""
         builder, _ = builder_and_patch
         p1 = builder.declare_patch(RotatedPlanarPatch(12, 12, location=(5, 5)))
@@ -57,9 +55,7 @@ class TestVisualiseLogicalPatch:
             datasets.append(data)
             return Path("/display/index.html")
 
-        monkeypatch.setattr(
-            "deltakit_visualise.logical_assembly_api_visualiser.show", fake_show
-        )
+        monkeypatch.setattr("deltakit_visualise.logical_assembly_api_visualiser.show", fake_show)
 
         _, p0 = builder_and_patch
         visualise_logical_patch(builder, p0)
