@@ -41,7 +41,11 @@ for _path in _PATHS_TO_CREATE:
 def get_asset_file_content(relative_path: str) -> str:
     """Read asset file content from the package using importlib.resources."""
     try:
-        return files("deltakit_visualise").joinpath("assets", relative_path).read_text()
+        return (
+            files("deltakit_visualise")
+            .joinpath("assets", relative_path)
+            .read_text(encoding="utf-8")
+        )
     except FileNotFoundError as e:
         msg = f"Asset file '{relative_path}' not found in deltakit_visualise package: {e}"
         raise FileNotFoundError(msg) from e
