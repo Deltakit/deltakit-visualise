@@ -5,9 +5,9 @@
 
 from pathlib import Path
 
-from dkit_compile.frontend.logasm import LogAsmBuilder, RotatedPlanarPatch
+from deltakit_compile.frontend.logasm import LogAsmBuilder, RotatedPlanarPatch
 
-from dkit_visualise.logical_assembly_api_visualiser import LogAsmAPIVisualiser
+from deltakit_visualise.logical_assembly_api_visualiser import LogAsmAPIVisualiser
 
 
 def visualise_logical_patch(

@@ -5,11 +5,11 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-from dkit_compile.frontend.logasm import LogAsmBuilder, RotatedPlanarPatch
+from deltakit_compile.frontend.logasm import LogAsmBuilder, RotatedPlanarPatch
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir import SSAValue
 
-from dkit_visualise.logical_assembly_api_visualiser import LogAsmAPIVisualiser
+from deltakit_visualise.logical_assembly_api_visualiser import LogAsmAPIVisualiser
 
 
 @pytest.fixture
@@ -45,7 +45,7 @@ class TestVisualiseLogicalPatch:
         builder, patch = builder_with_single_patch
 
         monkeypatch.setattr(
-            "dkit_visualise.logical_assembly_api_visualiser.show",
+            "deltakit_visualise.logical_assembly_api_visualiser.show",
             lambda _data, **_kwargs: Path("/display/index.html"),
         )
 
@@ -65,7 +65,7 @@ class TestVisualiseLogicalPatch:
             return Path("/display/index.html")
 
         monkeypatch.setattr(
-            "dkit_visualise.logical_assembly_api_visualiser.show", fake_show
+            "deltakit_visualise.logical_assembly_api_visualiser.show", fake_show
         )
 
         vis = LogAsmAPIVisualiser(builder)
@@ -87,7 +87,7 @@ class TestVisualiseLogicalPatch:
             return Path("/display/index.html")
 
         monkeypatch.setattr(
-            "dkit_visualise.logical_assembly_api_visualiser.show", fake_show
+            "deltakit_visualise.logical_assembly_api_visualiser.show", fake_show
         )
 
         LogAsmAPIVisualiser(builder).visualise_logical_patch(patch)
@@ -102,7 +102,7 @@ class TestVisualiseLogicalPatch:
         captured: dict = {}
 
         monkeypatch.setattr(
-            "dkit_visualise.logical_assembly_api_visualiser.show",
+            "deltakit_visualise.logical_assembly_api_visualiser.show",
             lambda data, **_kwargs: (
                 captured.__setitem__("data", data),
                 Path("/display/index.html"),

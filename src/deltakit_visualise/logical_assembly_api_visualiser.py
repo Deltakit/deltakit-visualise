@@ -6,14 +6,14 @@
 from pathlib import Path
 from typing import Any
 
-from dkit_compile.dialects.logical_assembly import IntAttr, MeasStabOp
-from dkit_compile.frontend.logasm import LogAsmBuilder, RotatedPlanarPatch
+from deltakit_compile.dialects.logical_assembly import IntAttr, MeasStabOp
+from deltakit_compile.frontend.logasm import LogAsmBuilder, RotatedPlanarPatch
 from xdsl.dialects.builtin import IntegerAttr, ModuleOp
 from xdsl.ir import Operation, OpResult, SSAValue
 
-from dkit_visualise.logical_assembly_visualiser import LogicalAssemblyVisualiser
-from dkit_visualise.pipelines.surfacecodes import PatchVisualisationPipeline
-from dkit_visualise.visualiser import get_visualisation_data, show
+from deltakit_visualise.logical_assembly_visualiser import LogicalAssemblyVisualiser
+from deltakit_visualise.pipelines.surfacecodes import PatchVisualisationPipeline
+from deltakit_visualise.visualiser import get_visualisation_data, show
 
 
 class LogAsmAPIVisualiser:

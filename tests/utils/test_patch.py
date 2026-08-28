@@ -4,9 +4,9 @@
 from pathlib import Path
 
 import pytest
-from dkit_compile.frontend.logasm import LogAsmBuilder, RotatedPlanarPatch
+from deltakit_compile.frontend.logasm import LogAsmBuilder, RotatedPlanarPatch
 
-from dkit_visualise.utils.patch import visualise_logical_patch
+from deltakit_visualise.utils.patch import visualise_logical_patch
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ class TestVisualiseLogicalPatch:
             return Path("/display/index.html")
 
         monkeypatch.setattr(
-            "dkit_visualise.logical_assembly_api_visualiser.LogAsmAPIVisualiser"
+            "deltakit_visualise.logical_assembly_api_visualiser.LogAsmAPIVisualiser"
             ".visualise_logical_patch",
             fake_visualise,
         )
@@ -58,7 +58,7 @@ class TestVisualiseLogicalPatch:
             return Path("/display/index.html")
 
         monkeypatch.setattr(
-            "dkit_visualise.logical_assembly_api_visualiser.show", fake_show
+            "deltakit_visualise.logical_assembly_api_visualiser.show", fake_show
         )
 
         _, p0 = builder_and_patch
