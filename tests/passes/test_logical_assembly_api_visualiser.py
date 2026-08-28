@@ -13,9 +13,7 @@ from deltakit_visualise.logical_assembly_api_visualiser import LogAsmAPIVisualis
 
 
 @pytest.fixture
-def builder_with_two_patches() -> tuple[
-    LogAsmBuilder, RotatedPlanarPatch, RotatedPlanarPatch
-]:
+def builder_with_two_patches() -> tuple[LogAsmBuilder, RotatedPlanarPatch, RotatedPlanarPatch]:
     """Builder with a distance-12 patch (p0) and a distance-5 patch (p1)."""
     builder = LogAsmBuilder()
     p0 = builder.declare_patch(RotatedPlanarPatch(12, 12, location=(0, 0)))
@@ -64,9 +62,7 @@ class TestVisualiseLogicalPatch:
             datasets.append(data)
             return Path("/display/index.html")
 
-        monkeypatch.setattr(
-            "deltakit_visualise.logical_assembly_api_visualiser.show", fake_show
-        )
+        monkeypatch.setattr("deltakit_visualise.logical_assembly_api_visualiser.show", fake_show)
 
         vis = LogAsmAPIVisualiser(builder)
         vis.visualise_logical_patch(p0)
@@ -75,9 +71,7 @@ class TestVisualiseLogicalPatch:
         assert len(datasets) == 2
         assert str(datasets[0]) != str(datasets[1])
 
-    def test_default_round_is_selected(
-        self, monkeypatch, builder_with_single_patch
-    ) -> None:
+    def test_default_round_is_selected(self, monkeypatch, builder_with_single_patch) -> None:
         """The default call returns the first round snapshot."""
         builder, patch = builder_with_single_patch
         captured: dict = {}
@@ -86,17 +80,13 @@ class TestVisualiseLogicalPatch:
             captured["data"] = data
             return Path("/display/index.html")
 
-        monkeypatch.setattr(
-            "deltakit_visualise.logical_assembly_api_visualiser.show", fake_show
-        )
+        monkeypatch.setattr("deltakit_visualise.logical_assembly_api_visualiser.show", fake_show)
 
         LogAsmAPIVisualiser(builder).visualise_logical_patch(patch)
 
         assert [item["round"] for item in captured["data"]["ops"]] == [1]
 
-    def test_selects_only_requested_round(
-        self, monkeypatch, builder_with_single_patch
-    ) -> None:
+    def test_selects_only_requested_round(self, monkeypatch, builder_with_single_patch) -> None:
         """The payload contains only the requested round snapshot."""
         builder, patch = builder_with_single_patch
         captured: dict = {}
@@ -127,9 +117,7 @@ class TestVisualiseLogicalPatch:
         """A non-positive round number raises a validation error."""
         builder, patch = builder_with_single_patch
 
-        with pytest.raises(
-            ValueError, match="Round number should be a positive number"
-        ):
+        with pytest.raises(ValueError, match="Round number should be a positive number"):
             LogAsmAPIVisualiser(builder).visualise_logical_patch(patch, round_no=0)
 
 
@@ -167,9 +155,7 @@ class TestExtractPatchOperations:
         filtered_op_count = sum(1 for _ in filtered.body.block.ops)
         assert filtered_op_count < full_op_count
 
-    def test_returns_full_module_for_unknown_type(
-        self, builder_with_single_patch
-    ) -> None:
+    def test_returns_full_module_for_unknown_type(self, builder_with_single_patch) -> None:
         """When the patch has no .ssa, the full module is returned unchanged."""
         builder, _ = builder_with_single_patch
         vis = LogAsmAPIVisualiser(builder)
@@ -204,9 +190,7 @@ class TestCreateFilteredModule:
         round_two = vis._filter_module_by_round(full_module, 2)
         round_eight = vis._filter_module_by_round(full_module, 8)
 
-        round_two_op = next(
-            op for op in round_two.body.block.ops if op.name == "log_asm.meas_stab"
-        )
+        round_two_op = next(op for op in round_two.body.block.ops if op.name == "log_asm.meas_stab")
         round_eight_op = next(
             op for op in round_eight.body.block.ops if op.name == "log_asm.meas_stab"
         )
@@ -224,9 +208,7 @@ class TestCreateFilteredModule:
 
         assert result is original
 
-    def test_cloned_module_contains_correct_op_count(
-        self, builder_with_two_patches
-    ) -> None:
+    def test_cloned_module_contains_correct_op_count(self, builder_with_two_patches) -> None:
         """Filtered module contains exactly the collected ops."""
         builder, p0, _ = builder_with_two_patches
         vis = LogAsmAPIVisualiser(builder)
@@ -238,9 +220,7 @@ class TestCreateFilteredModule:
         # declare + prepare + measure_stabilisers = 3 ops for p0
         assert op_count == 3
 
-    def test_ssa_operands_are_remapped_within_clone(
-        self, builder_with_single_patch
-    ) -> None:
+    def test_ssa_operands_are_remapped_within_clone(self, builder_with_single_patch) -> None:
         """Cloned ops reference each other, not the original builder ops."""
         builder, patch = builder_with_single_patch
         vis = LogAsmAPIVisualiser(builder)

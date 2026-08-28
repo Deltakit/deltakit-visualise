@@ -86,18 +86,14 @@ class LogAsmAPIVisualiser:
         pipeline.apply(ctx, filtered_module)
 
         visualisation_data = get_visualisation_data(filtered_module)
-        round_data = [
-            item for item in visualisation_data["ops"] if item.get("round") == round_no
-        ]
+        round_data = [item for item in visualisation_data["ops"] if item.get("round") == round_no]
         visualisation_data["ops"] = round_data
 
         return show(visualisation_data, static=True)
 
     def _get_max_round_number(self, module: ModuleOp) -> int:
         """Return the cumulative number of measurement rounds in a module."""
-        return sum(
-            op.min_rounds.data for op in module.walk() if isinstance(op, MeasStabOp)
-        )
+        return sum(op.min_rounds.data for op in module.walk() if isinstance(op, MeasStabOp))
 
     def _get_module_from_builder(self) -> ModuleOp:
         """Convert the current builder state to a ModuleOp."""
@@ -120,9 +116,7 @@ class LogAsmAPIVisualiser:
 
         return module
 
-    def _extract_patch_from_ssa_value(
-        self, module: ModuleOp, ssa_value: SSAValue
-    ) -> ModuleOp:
+    def _extract_patch_from_ssa_value(self, module: ModuleOp, ssa_value: SSAValue) -> ModuleOp:
         """
         Extract patch operations for a specific SSA value.
 
@@ -194,9 +188,7 @@ class LogAsmAPIVisualiser:
         for op in filtered_ops:
             clone = op.clone(value_mapper=value_mapper)
             if isinstance(clone, MeasStabOp):
-                clone.min_rounds = IntAttr.get(
-                    min(clone.min_rounds.data, max(round_no, 0))
-                )
+                clone.min_rounds = IntAttr.get(min(clone.min_rounds.data, max(round_no, 0)))
             clones.append(clone)
 
         return ModuleOp(clones) if clones else module
