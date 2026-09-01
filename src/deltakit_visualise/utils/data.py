@@ -73,5 +73,5 @@ def prepare_html(data: dict[str, Any]) -> None:
     new_content = new_content.replace("{{fetch_data_script}}", "")
     new_content = new_content.replace("{{render_command}}", RENDER_DATA_COMMAND)
 
-    with display_index_html.open("w") as file:
+    with display_index_html.open("w", encoding="utf-8") as file:
         file.write(new_content)
