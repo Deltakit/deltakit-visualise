@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Deltakit Visualiser</title>
+  </head>
+
+  <body>
+    <div id="app"></div>
+    {{deltakit_vis_script}}
+    <script>
+      {{fetch_data_script}}
+      const deltakit = new Deltakit('app');
+      {{render_command}}
+    </script>
+  </body>
+</html>
