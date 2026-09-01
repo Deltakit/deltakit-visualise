@@ -1,5 +1,3 @@
-# This file contains information which is proprietary to Riverlane Ltd
-# ("Riverlane") and is Riverlane Confidential Information.
 # (c) Copyright Riverlane 2025-2026. All rights reserved.
 """FastAPI server for deltakit-visualise."""
 
@@ -47,8 +45,12 @@ def create_app(
         """Serve the frontend index.html with render command injected."""
         content = INDEX_HTML.read_text(encoding="utf-8")
         modified_content = content.replace("{{fetch_data_script}}", FETCH_DATA_SCRIPT)
-        modified_content = modified_content.replace("{{render_command}}", render_command)
-        modified_content = modified_content.replace("{{deltakit_vis_script}}", DELTAKIT_VIS_SCRIPT)
+        modified_content = modified_content.replace(
+            "{{render_command}}", render_command
+        )
+        modified_content = modified_content.replace(
+            "{{deltakit_vis_script}}", DELTAKIT_VIS_SCRIPT
+        )
         return HTMLResponse(content=modified_content)
 
     @app.get("/deltakit-visualise.umd.js")
@@ -81,7 +83,9 @@ def create_app(
         """Return logical patch data for a range of rounds (inclusive)."""
 
         ops_list = app.state.logical_patches_data.get("ops", [])
-        patch_data_for_rounds = [op for op in ops_list if start <= op.get("round", 0) <= end]
+        patch_data_for_rounds = [
+            op for op in ops_list if start <= op.get("round", 0) <= end
+        ]
 
         return {
             "type": app.state.logical_patches_data.get("type", ""),

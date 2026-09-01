@@ -1,5 +1,3 @@
-# This file contains information which is proprietary to Riverlane Ltd
-# ("Riverlane") and is Riverlane Confidential Information.
 # (c) Copyright Riverlane 2025-2026. All rights reserved.
 """
 Compiler pass that walks the AST to insert START_HEIGHT_ATTR and END_HEIGHT_ATTR
@@ -84,7 +82,9 @@ def handle_parallel_height(op: ParallelOp, tracker: HeightTracker) -> None:
 
 
 @insert_height.register
-def handle_patch_declaration_height(op: PatchDeclarationOp, tracker: HeightTracker) -> None:
+def handle_patch_declaration_height(
+    op: PatchDeclarationOp, tracker: HeightTracker
+) -> None:
     """PatchDeclarationOp occupies DEFAULT_HEIGHT_COST height units."""
     start, end = tracker.consume(DEFAULT_HEIGHT_COST)
     op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
@@ -116,7 +116,9 @@ def handle_measure_height(op: MeasureOp, tracker: HeightTracker) -> None:
 
 
 @insert_height.register
-def handle_multi_pauli_meas_height(op: MultiPauliMeasOp, tracker: HeightTracker) -> None:
+def handle_multi_pauli_meas_height(
+    op: MultiPauliMeasOp, tracker: HeightTracker
+) -> None:
     """MultiPauliMeasOp occupies *rounds* height units."""
     start, end = tracker.consume(op.rounds.data)
     op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())

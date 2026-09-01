@@ -1,5 +1,3 @@
-# This file contains information which is proprietary to Riverlane Ltd
-# ("Riverlane") and is Riverlane Confidential Information.
 # (c) Copyright Riverlane 2025-2026. All rights reserved.
 """
 This is a compiler pass that generates the data required for the surface code visualisation
@@ -82,7 +80,9 @@ class SurfaceCodeVisualisationState:
         patch_items: Fast lookup of patch payload items with key as round index.
     """
 
-    visualisation_data: list[InternalPatchVisualisationItem] = field(default_factory=list)
+    visualisation_data: list[InternalPatchVisualisationItem] = field(
+        default_factory=list
+    )
     round_indices: dict[RoundOp, list[int]] = field(default_factory=dict)
     round_counter: int = 0
     coordinates_map: dict[tuple[SSAValue, int | None], tuple[float, float]] = field(
@@ -113,7 +113,9 @@ def _get_round_ancestor(op: Operation) -> RoundOp:
     raise ValueError(msg)
 
 
-def _get_round_index_with_state(op: PlaquetteOp, state: SurfaceCodeVisualisationState) -> list[int]:
+def _get_round_index_with_state(
+    op: PlaquetteOp, state: SurfaceCodeVisualisationState
+) -> list[int]:
     """Get stable round indices from the cached round map."""
     round_op = _get_round_ancestor(op)
     if round_op in state.round_indices:
@@ -132,7 +134,9 @@ def _get_round_index_with_state(op: PlaquetteOp, state: SurfaceCodeVisualisation
     raise ValueError(msg)
 
 
-def _get_round_location(op: PlaquetteOp, state: SurfaceCodeVisualisationState) -> list[float]:
+def _get_round_location(
+    op: PlaquetteOp, state: SurfaceCodeVisualisationState
+) -> list[float]:
     """Get patch location from data qubits in the surrounding plaquette.round op."""
     round_op = _get_round_ancestor(op)
 
@@ -152,7 +156,9 @@ def _get_round_location(op: PlaquetteOp, state: SurfaceCodeVisualisationState) -
     return [min_x - 0.5, min_y - 0.5]
 
 
-def _index_round_executions_in_op(op: Operation, state: SurfaceCodeVisualisationState) -> None:
+def _index_round_executions_in_op(
+    op: Operation, state: SurfaceCodeVisualisationState
+) -> None:
     """Populate round indices in execution order, expanding qstruct.repeat blocks."""
     if isinstance(op, RepeatOp):
         repetitions = op.repetitions.data
@@ -173,7 +179,9 @@ def _index_round_executions_in_op(op: Operation, state: SurfaceCodeVisualisation
                 _index_round_executions_in_op(child, state)
 
 
-def _build_round_indices(module_op: ModuleOp, state: SurfaceCodeVisualisationState) -> None:
+def _build_round_indices(
+    module_op: ModuleOp, state: SurfaceCodeVisualisationState
+) -> None:
     """Precompute global round indices for each plaquette.round execution."""
     _index_round_executions_in_op(module_op, state)
 
@@ -200,7 +208,9 @@ def _resolve_block_argument_coordinate(
     if isinstance(parent_op, CircuitOp):
         return _resolve_qubit_coordinate(parent_op.args[ssa.index], state, reg_index)
     if isinstance(parent_op, RepeatOp):
-        return _resolve_qubit_coordinate(parent_op.iter_args[ssa.index], state, reg_index)
+        return _resolve_qubit_coordinate(
+            parent_op.iter_args[ssa.index], state, reg_index
+        )
 
     msg = f"Unsupported block argument parent while resolving coordinates: {parent_op}."
     raise ValueError(msg)
@@ -240,7 +250,9 @@ def _resolve_op_result_coordinate(  # noqa: PLR0911
         return _resolve_qubit_coordinate(owner.reg, state, ssa.index)
     if isinstance(owner, PackQubitRegOp):
         if reg_index is None:
-            msg = "PackQubitRegOp requires register index to resolve a qubit coordinate."
+            msg = (
+                "PackQubitRegOp requires register index to resolve a qubit coordinate."
+            )
             raise ValueError(msg)
         return _resolve_qubit_coordinate(owner.qubits[reg_index], state)
     if isinstance(owner, CastOp):
@@ -312,7 +324,9 @@ def _rebuild_qubits_and_coordinates(item: InternalPatchVisualisationItem) -> Non
 
     plaquettes = item["patches"][0]["plaquettes"]
     for plaquette in plaquettes:
-        plaquette["coordinates"] = [id_by_coord[coord] for coord in plaquette["_coord_keys"]]
+        plaquette["coordinates"] = [
+            id_by_coord[coord] for coord in plaquette["_coord_keys"]
+        ]
 
 
 def _get_or_create_patch_item(
@@ -365,7 +379,9 @@ def _get_plaquette_shape(
     has_ancilla_participant = any(
         qubit_type_by_coord[coord] == "ancilla" for coord in involved_coords
     )
-    return PlaquetteShape.SEMICIRCLE if has_ancilla_participant else PlaquetteShape.SQUARE
+    return (
+        PlaquetteShape.SEMICIRCLE if has_ancilla_participant else PlaquetteShape.SQUARE
+    )
 
 
 def _get_plaquette_weight(
@@ -410,7 +426,9 @@ def visualise_round_op(op: RoundOp, state: SurfaceCodeVisualisationState) -> Non
 
 
 @visualise_plaquette.register
-def visualise_alloc_qubits_op(op: AllocQubitOp, state: SurfaceCodeVisualisationState) -> None:
+def visualise_alloc_qubits_op(
+    op: AllocQubitOp, state: SurfaceCodeVisualisationState
+) -> None:
     """Warm coordinate cache for directly allocated qubits."""
     for result in op.results:
         if not isinstance(result.type, QubitType):
@@ -422,10 +440,14 @@ def visualise_alloc_qubits_op(op: AllocQubitOp, state: SurfaceCodeVisualisationS
 
 
 @visualise_plaquette.register
-def visualise_plaquette_op(op: PlaquetteOp, state: SurfaceCodeVisualisationState) -> None:
+def visualise_plaquette_op(
+    op: PlaquetteOp, state: SurfaceCodeVisualisationState
+) -> None:
     """Handle plaquette operations and aggregate surface-code visualisation data."""
     data_coords = [_resolve_qubit_coordinate(qubit, state) for qubit in op.data_qubits]
-    ancilla_coords = [_resolve_qubit_coordinate(qubit, state) for qubit in op.ancilla_qubits]
+    ancilla_coords = [
+        _resolve_qubit_coordinate(qubit, state) for qubit in op.ancilla_qubits
+    ]
 
     round_indices = _get_round_index_with_state(op, state)
 

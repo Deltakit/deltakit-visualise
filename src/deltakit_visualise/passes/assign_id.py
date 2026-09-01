@@ -1,5 +1,3 @@
-# This file contains information which is proprietary to Riverlane Ltd
-# ("Riverlane") and is Riverlane Confidential Information.
 # (c) Copyright Riverlane 2025-2026. All rights reserved.
 """Module for assigning unique identifiers to logical assembly operations.
 
@@ -76,16 +74,24 @@ def handle_multi_pauli_meas_id(op: MultiPauliMeasOp, tracker: IdTracker) -> None
     in_logical_ids = [tracker.next_id() for _ in op.logical_patches]
     out_logical_ids = [tracker.assign(res) for res in op.res]
 
-    op.attributes[IN_LOGICAL_PATCHES_ID] = ArrayAttr([StringAttr(pid) for pid in in_logical_ids])
-    op.attributes[OUT_LOGICAL_PATCHES_ID] = ArrayAttr([StringAttr(pid) for pid in out_logical_ids])
+    op.attributes[IN_LOGICAL_PATCHES_ID] = ArrayAttr(
+        [StringAttr(pid) for pid in in_logical_ids]
+    )
+    op.attributes[OUT_LOGICAL_PATCHES_ID] = ArrayAttr(
+        [StringAttr(pid) for pid in out_logical_ids]
+    )
 
     # for each bridge patch, we need to assign a unique ID given that
     # tracker.get_or_assign(bridge_patch) is returning the same ID for the bridge patch declaration
     in_bridge_ids = [tracker.next_id() for _ in op.bridge_patches]
     out_bridge_ids = [tracker.next_id() for _ in op.bridge_patches]
 
-    op.attributes[IN_BRIDGE_PATCHES_ID] = ArrayAttr([StringAttr(pid) for pid in in_bridge_ids])
-    op.attributes[OUT_BRIDGE_PATCHES_ID] = ArrayAttr([StringAttr(pid) for pid in out_bridge_ids])
+    op.attributes[IN_BRIDGE_PATCHES_ID] = ArrayAttr(
+        [StringAttr(pid) for pid in in_bridge_ids]
+    )
+    op.attributes[OUT_BRIDGE_PATCHES_ID] = ArrayAttr(
+        [StringAttr(pid) for pid in out_bridge_ids]
+    )
 
     tracker.assign(op.measurement)
 

@@ -1,5 +1,3 @@
-# This file contains information which is proprietary to Riverlane Ltd
-# ("Riverlane") and is Riverlane Confidential Information.
 # (c) Copyright Riverlane 2025-2026. All rights reserved.
 """Reading visualisation data off a module and rendering it in the browser."""
 
@@ -57,7 +55,9 @@ def get_visualisation_data(
         PATCH_VISUALISATION_DATA
     )
     visualisation_type = (
-        f"{SPACE_TIME}" if module.attributes.get(VISUALISE_SPACETIME_DATA) else f"{LOGICAL_PATCH}"
+        f"{SPACE_TIME}"
+        if module.attributes.get(VISUALISE_SPACETIME_DATA)
+        else f"{LOGICAL_PATCH}"
     )
     if attr is None:
         msg = (
