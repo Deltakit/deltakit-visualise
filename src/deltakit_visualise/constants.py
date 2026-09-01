@@ -43,9 +43,7 @@ def get_asset_file_content(relative_path: str) -> str:
     try:
         return files("deltakit_visualise").joinpath("assets", relative_path).read_text()
     except FileNotFoundError as e:
-        msg = (
-            f"Asset file '{relative_path}' not found in deltakit_visualise package: {e}"
-        )
+        msg = f"Asset file '{relative_path}' not found in deltakit_visualise package: {e}"
         raise FileNotFoundError(msg) from e
 
 
@@ -62,9 +60,7 @@ IN_BRIDGE_PATCHES_ID: Final[str] = "visualise.multi_pauli_meas.bridge_patches.in
 OUT_BRIDGE_PATCHES_ID: Final[str] = "visualise.multi_pauli_meas.bridge_patches.out.id"
 
 # Allowed origins for CORS in the FastAPI server, update to include any additional origins as needed
-ALLOWED_ORIGINS: Final[list[str]] = [
-    f"http://localhost:{port_no}" for port_no in range(5173, 5179)
-]
+ALLOWED_ORIGINS: Final[list[str]] = [f"http://localhost:{port_no}" for port_no in range(5173, 5179)]
 
 # Commands to be injected into the frontend index.html for rendering visualisation data
 RENDER_DATA_COMMAND = "deltakit.render(data);"

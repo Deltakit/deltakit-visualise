@@ -65,9 +65,7 @@ class LogicalAssemblyVisualiser:
         """Whether to verify the IR between each pair of passes (testing aid)."""
 
     @classmethod
-    def from_log_asm_file(
-        cls, file_path: str, *, verify_between_passes: bool = False
-    ) -> Self:
+    def from_log_asm_file(cls, file_path: str, *, verify_between_passes: bool = False) -> Self:
         """Build a visualiser from a Logical-Assembly ``.mlir`` file."""
         return cls(
             cls.parse_mlir_file(file_path),
@@ -174,9 +172,9 @@ class LogicalAssemblyVisualiser:
         space_time_data = get_visualisation_data(module_copy_for_spacetime)
 
         module_copy_for_logical_patches = self.module.clone()
-        PatchVisualisationPipeline(
-            verify_between_passes=self.verify_between_passes
-        ).apply(ctx, module_copy_for_logical_patches)
+        PatchVisualisationPipeline(verify_between_passes=self.verify_between_passes).apply(
+            ctx, module_copy_for_logical_patches
+        )
         module_copy_for_logical_patches.verify()
 
         logical_patches_data = get_visualisation_data(module_copy_for_logical_patches)

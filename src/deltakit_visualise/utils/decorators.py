@@ -43,9 +43,7 @@ def simple_file_cache(
             # create unique cache key from function name and arguments
             key_data = f"{func.__name__}{args}{kwargs}"
             # MD5 is used only to derive a cache filename, not for security.
-            cache_key = hashlib.md5(
-                key_data.encode(), usedforsecurity=False
-            ).hexdigest()
+            cache_key = hashlib.md5(key_data.encode(), usedforsecurity=False).hexdigest()
             cache_file = cache_dir / cache_key
 
             # check if cache exists

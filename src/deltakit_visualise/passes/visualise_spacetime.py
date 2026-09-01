@@ -73,9 +73,7 @@ def get_end_height(op: Operation) -> float:
 
 
 @singledispatch
-def handle_operation(
-    _op: Operation, _visualisation_data: list[SpaceTimeVisualisationItem]
-) -> None:
+def handle_operation(_op: Operation, _visualisation_data: list[SpaceTimeVisualisationItem]) -> None:
     """
     Generic operation handler using single dispatch.
     This function dispatches to specific handlers based on the type of the operation.
@@ -219,12 +217,8 @@ def handle_multi_pauli_measurement(
     results: list[SpaceTimeVisualisationItem] = []
     basis = op.basis
 
-    logical_patches = [
-        cast(SurfaceCodeBasePatch, patch.type) for patch in op.logical_patches
-    ]
-    bridge_patches = [
-        cast(SurfaceCodeBasePatch, patch.type) for patch in op.bridge_patches
-    ]
+    logical_patches = [cast(SurfaceCodeBasePatch, patch.type) for patch in op.logical_patches]
+    bridge_patches = [cast(SurfaceCodeBasePatch, patch.type) for patch in op.bridge_patches]
     logical_sides, bridge_sides = get_visible_sides(logical_patches, bridge_patches)
 
     # Process all logical patches
@@ -356,6 +350,4 @@ class VisualiseSpacetime(ModulePass):
         for child in op.walk():
             handle_operation(child, visualisation_data)
         # Store the visualisation_data on the module for later retrieval
-        op.attributes[VISUALISE_SPACETIME_DATA] = StringAttr(
-            json.dumps(visualisation_data)
-        )
+        op.attributes[VISUALISE_SPACETIME_DATA] = StringAttr(json.dumps(visualisation_data))
