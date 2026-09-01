@@ -13,6 +13,10 @@ from deltakit_compile.dialects.qcore import QCore
 from deltakit_compile.dialects.qstruct import QStruct
 from deltakit_compile.frontend.logasm import LogAsmBuilder, LogAsmProgram
 from deltakit_compile.passes.common.pipeline import ConfigurablePipeline
+from deltakit_compile.passes.log_asm_api.pipeline import (
+    LogAsmApiToLogAsmPipeline,
+    LogAsmApiToLogAsmPipelineConfig,
+)
 from typing_extensions import Self
 from uvicorn import Server
 from xdsl.context import Context
@@ -35,9 +39,10 @@ class LogicalAssemblyVisualiser:
     program straight from the builder, still containing ``log_asm_api`` ops), a
     ``LogAsmProgram`` (a built program, e.g. the result of ``build_program``), or
     a ``ModuleOp`` already restricted to the ``log_asm``/``qstruct``/``arith``/
-    ``builtin`` dialects ``make_context`` loads — or use one of the
-    ``from_log_asm_*`` constructors. Each ``visualise_*`` method runs a
-    dedicated pipeline over the program and opens the result in the browser.
+    ``builtin`` dialects ``make_context`` loads. The ``from_log_asm_*``
+    constructors cover the Logical Assembly IR cases: a ``.mlir`` file or a ``ModuleOp``.
+    Each ``visualise_*`` method runs a dedicated pipeline over the program and
+    opens the result in the browser.
 
     High-level use — visualise straight from a file or IR::
 
@@ -58,6 +63,7 @@ class LogicalAssemblyVisualiser:
         *,
         verify_between_passes: bool = False,
     ) -> None:
+        self.context = self.make_context()
         self.module = self._to_module(program)
         self.verify_between_passes = verify_between_passes
         self._server: Server | None = None
@@ -118,17 +124,23 @@ class LogicalAssemblyVisualiser:
         self.module.verify()
         return show(get_visualisation_data(self.module), static=static)
 
-    @staticmethod
-    def _to_module(program: LogAsmBuilder | LogAsmProgram | ModuleOp) -> ModuleOp:
+    def _to_module(self, program: LogAsmBuilder | LogAsmProgram | ModuleOp) -> ModuleOp:
         """Normalise the input to a ``ModuleOp``, building a builder if needed.
 
         A ``LogAsmProgram`` wraps its IR under ``.module``; a ``LogAsmBuilder`` is
         first built into a program. A ``ModuleOp`` is returned as-is.
         """
+
         if isinstance(program, LogAsmBuilder):
             program = program.build_program()
         if isinstance(program, LogAsmProgram):
-            return program.module
+            program = program.module
+            api_to_logasm_config: LogAsmApiToLogAsmPipelineConfig = (
+                LogAsmApiToLogAsmPipelineConfig()
+            )
+            LogAsmApiToLogAsmPipeline.from_configuration(api_to_logasm_config).apply(
+                self.context, program
+            )
         return program
 
     @classmethod
@@ -161,7 +173,7 @@ class LogicalAssemblyVisualiser:
         This is a convenience method that runs the spacetime visualisation
         pipeline and opens the result in the browser.
         """
-        ctx = self.make_context()
+        ctx = self.context
 
         module_copy_for_spacetime = self.module.clone()
         SpacetimePipeline(verify_between_passes=self.verify_between_passes).apply(
