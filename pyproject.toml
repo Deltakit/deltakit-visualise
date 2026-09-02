@@ -152,7 +152,7 @@ Normalize = "Normalize"
 
 [tool.typos.files]
 # Paths/patterns to exclude from spell checking
-extend-exclude = ["**/LICENSE", "**/*.html", "logasm_visualiser_tutorial.ipynb"]
+extend-exclude = ["**/LICENSE", "**/*.html"]
 
 [tool.bandit]
 exclude_dirs = ['.github', '.tox', '.venv', '**/lit.cfg.py']
