@@ -43,7 +43,7 @@ dependencies = [
   "platformdirs>=4.10.0,<5",
   "deltakit-compile>=0.1,<0.2",
   "typing_extensions >=4.15, <5",
-  "xdsl>=0.66,<0.67",
+  "xdsl>=0.66,<0.71",
   # Required by utils.notebook for the in-cell "Open link" button. It is imported
   # dynamically, so deptry cannot see it (see tool.deptry.per_rule_ignores below).
   # ipywidgets pulls in ipython; ipykernel is provided by whatever runs the kernel.
