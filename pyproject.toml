@@ -62,14 +62,14 @@ test = [
   "pytest>=9.0.3,<10",
   "pytest-cov>=7.1.0,<8",
   "filecheck >=1.0.3, <2",
-  "lit >=18.1.8, <19",
+  "lit>=18.1.8,<24",
   "coverage>=7.15.2,<8",
   "httpx2>=2.9.0,<3",
 ]
 
 lint = [
   "mypy>=2.1.0,<3",
-  "ruff==0.15.22",
+  "ruff==0.16.5",
   "typos>=1.46.3,<2",
   "deptry>=0.25.1,<0.26",
   "pydoclint>=0.9.1,<0.10",
@@ -84,12 +84,12 @@ dev = [
   { include-group = "security" },
   { include-group = "notebook" },
   "pre-commit>=4.6.0,<5",
-  "validate-pyproject>=0.25,<0.26",
+  "validate-pyproject>=0.25,<0.27",
   # Read by the build backend (build.py, also listed in [build-system].requires) and by
   # dev_setup.py. The runtime package never imports it, so it is not a project dependency.
   "python-decouple>=3.8,<4",
-  "setuptools>=83.0.0,<84",
-  "types-setuptools>=83.0.0,<84",
+  "setuptools>=83.0.0,<85",
+  "types-setuptools>=83.0.0,<85",
 ]
 release = [
   "python-semantic-release >=10.6.1, <11",
