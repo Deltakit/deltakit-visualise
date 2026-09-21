@@ -12,11 +12,13 @@ from dataclasses import dataclass, field
 from functools import singledispatch
 
 from deltakit_compile.dialects.logical_assembly import (
+    GrowOp,
     MeasStabOp,
     MeasureOp,
     MultiPauliMeasOp,
     PatchDeclarationOp,
     PrepareOp,
+    ShrinkOp,
 )
 from deltakit_compile.dialects.qstruct import ParallelOp
 from xdsl.dialects.builtin import Float64Type, FloatAttr, ModuleOp
@@ -101,6 +103,22 @@ def handle_prepare_height(op: PrepareOp, tracker: HeightTracker) -> None:
 def handle_meas_stab_height(op: MeasStabOp, tracker: HeightTracker) -> None:
     """MeasStabOp occupies *min_rounds* height units."""
     start, end = tracker.consume(op.min_rounds.data)
+    op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
+    op.attributes[END_HEIGHT_ATTR] = FloatAttr(end, Float64Type())
+
+
+@insert_height.register
+def handle_grow_height(op: GrowOp, tracker: HeightTracker) -> None:
+    """GrowOp occupies *rounds* height units."""
+    start, end = tracker.consume(op.rounds.data)
+    op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
+    op.attributes[END_HEIGHT_ATTR] = FloatAttr(end, Float64Type())
+
+
+@insert_height.register
+def handle_shrink_height(op: ShrinkOp, tracker: HeightTracker) -> None:
+    """ShrinkOp occupies *rounds* height units."""
+    start, end = tracker.consume(op.rounds.data)
     op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
     op.attributes[END_HEIGHT_ATTR] = FloatAttr(end, Float64Type())
 

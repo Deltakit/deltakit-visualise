@@ -3,6 +3,7 @@
 
 import pytest
 from deltakit_compile.dialects.logical_assembly import (
+    GrowOp,
     MeasStabOp,
     MeasureOp,
     MultiPauliMeasOp,
@@ -11,6 +12,7 @@ from deltakit_compile.dialects.logical_assembly import (
     PlacementAttr,
     PrepareOp,
     RotatedPlanarPatchType,
+    ShrinkOp,
 )
 from deltakit_compile.dialects.qcore import PauliAttr
 from xdsl.dialects import test
@@ -29,11 +31,13 @@ from deltakit_visualise.constants import (
 from deltakit_visualise.passes.visualise_spacetime import (
     get_end_height,
     get_start_height,
+    handle_grow_operation,
     handle_measure_operation,
     handle_measure_stabiliser,
     handle_multi_pauli_measurement,
     handle_patch_declaration,
     handle_prepare_operation,
+    handle_shrink_operation,
 )
 from deltakit_visualise.types import (
     SideColour,
@@ -71,7 +75,7 @@ class TestHeightAttributes:
             get_end_height(op)
 
     def test_handle_patch_declaration_missing_start_height_raises_error(self):
-        """handle_patch_declaration raises ValueError when START_HEIGHT_ATTR is missing."""
+        """Test missing START_HEIGHT_ATTR raises ValueError."""
         patch_type = RotatedPlanarPatchType(
             make_size(5, 5), PlacementAttr([1, 1], OrientationEnum.VERTICAL_Z)
         )
@@ -200,6 +204,114 @@ class TestHandleMeasStabOp:
         assert "startHeight" in surface_data
 
 
+class TestHandleGrowOp:
+    """Tests for handle_grow_operation handler."""
+
+    def test_outputs_source_and_destination_geometry(self):
+        """Test that GrowOp outputs the geometry of both patch versions."""
+        source_type = RotatedPlanarPatchType(
+            make_size(5, 5), PlacementAttr([1, 1], OrientationEnum.VERTICAL_Z)
+        )
+        destination_type = RotatedPlanarPatchType(
+            make_size(7, 6), PlacementAttr([0, 2], OrientationEnum.VERTICAL_Z)
+        )
+        patch = test.TestOp(result_types=[source_type]).res[0]
+        op = GrowOp(patch, 10, destination_type)
+        op.attributes[START_HEIGHT_ATTR] = IntAttr(0)
+        op.attributes[END_HEIGHT_ATTR] = IntAttr(10)
+        op.attributes[IN_OP_ID] = StringAttr("patch_A_1_")
+        op.attributes[OUT_OP_ID] = StringAttr("patch_A_2_")
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+
+        handle_grow_operation(op, visualisation_data)
+
+        assert len(visualisation_data) == 5
+        small_surface = visualisation_data[0]
+        initial_big_surface = visualisation_data[1]
+        resize = visualisation_data[2]
+        final_big_surface = visualisation_data[3]
+        sides = visualisation_data[4]
+        assert small_surface["type"] == "surface"
+        assert small_surface["id"] == "patch_A_1_"
+        assert small_surface["location"] == (1, 1)
+        assert small_surface["size"] == (5, 5)
+        assert small_surface["startHeight"] == 0.0
+        assert initial_big_surface["type"] == "surface"
+        assert initial_big_surface["id"] == "patch_A_2_"
+        assert initial_big_surface["location"] == (0, 2)
+        assert initial_big_surface["size"] == (7, 6)
+        assert initial_big_surface["startHeight"] == 0.0
+        assert resize == {
+            "type": "resize",
+            "op_name": "log_asm.grow",
+            "fromSurfaceId": "patch_A_1_",
+            "toSurfaceId": "patch_A_2_",
+        }
+        assert final_big_surface["location"] == (0, 2)
+        assert final_big_surface["size"] == (7, 6)
+        assert final_big_surface["id"] == "patch_A_2__end"
+        assert final_big_surface["startHeight"] == 10.0
+        assert sides["type"] == "side"
+        assert sides["colourScheme"] == (SideColour.RED, SideColour.BLUE)
+        assert sides["sides"] == {"+X": True, "-X": True, "+Y": True, "-Y": True}
+        assert sides["fromSurfaceId"] == "patch_A_2_"
+        assert sides["toSurfaceId"] == "patch_A_2__end"
+
+
+class TestHandleShrinkOp:
+    """Tests for handle_shrink_operation handler."""
+
+    def test_outputs_source_and_destination_geometry(self):
+        """Test that ShrinkOp outputs the geometry of both patch versions."""
+        source_type = RotatedPlanarPatchType(
+            make_size(7, 6), PlacementAttr([0, 2], OrientationEnum.VERTICAL_Z)
+        )
+        destination_type = RotatedPlanarPatchType(
+            make_size(5, 5), PlacementAttr([1, 1], OrientationEnum.VERTICAL_Z)
+        )
+        patch = test.TestOp(result_types=[source_type]).res[0]
+        op = ShrinkOp(patch, 10, destination_type)
+        op.attributes[START_HEIGHT_ATTR] = IntAttr(0)
+        op.attributes[END_HEIGHT_ATTR] = IntAttr(10)
+        op.attributes[IN_OP_ID] = StringAttr("patch_A_1_")
+        op.attributes[OUT_OP_ID] = StringAttr("patch_A_2_")
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+
+        handle_shrink_operation(op, visualisation_data)
+
+        assert len(visualisation_data) == 5
+        big_surface = visualisation_data[0]
+        initial_small_surface = visualisation_data[1]
+        resize = visualisation_data[2]
+        final_small_surface = visualisation_data[3]
+        sides = visualisation_data[4]
+        assert big_surface["type"] == "surface"
+        assert big_surface["id"] == "patch_A_1_"
+        assert big_surface["location"] == (0, 2)
+        assert big_surface["size"] == (7, 6)
+        assert big_surface["startHeight"] == 0.0
+        assert initial_small_surface["type"] == "surface"
+        assert initial_small_surface["id"] == "patch_A_2_"
+        assert initial_small_surface["location"] == (1, 1)
+        assert initial_small_surface["size"] == (5, 5)
+        assert initial_small_surface["startHeight"] == 0.0
+        assert resize == {
+            "type": "resize",
+            "op_name": "log_asm.shrink",
+            "fromSurfaceId": "patch_A_1_",
+            "toSurfaceId": "patch_A_2_",
+        }
+        assert final_small_surface["location"] == (1, 1)
+        assert final_small_surface["size"] == (5, 5)
+        assert final_small_surface["id"] == "patch_A_2__end"
+        assert final_small_surface["startHeight"] == 10.0
+        assert sides["type"] == "side"
+        assert sides["colourScheme"] == (SideColour.RED, SideColour.BLUE)
+        assert sides["sides"] == {"+X": True, "-X": True, "+Y": True, "-Y": True}
+        assert sides["fromSurfaceId"] == "patch_A_2_"
+        assert sides["toSurfaceId"] == "patch_A_2__end"
+
+
 class TestHandleMultiPauliMeasurement:
     """Tests for handle_multi_pauli_measurement handler."""
 
@@ -237,8 +349,8 @@ class TestHandleMultiPauliMeasurement:
 
         handle_multi_pauli_measurement(op, visualisation_data)
 
-        # Output: 2 logical (start surface + sides + end surface each)
-        # + 1 bridge (surface + sides + surface) = 9
+        # Output: 2 logical (start surface + sides + end surface each) +
+        # 1 bridge (surface + sides + surface) = 9
         assert len(visualisation_data) == 9
 
         # Check sides data

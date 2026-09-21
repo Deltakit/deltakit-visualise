@@ -10,11 +10,13 @@ from functools import singledispatch
 from typing import cast
 
 from deltakit_compile.dialects.logical_assembly import (
+    GrowOp,
     MeasStabOp,
     MeasureOp,
     MultiPauliMeasOp,
     PatchDeclarationOp,
     PrepareOp,
+    ShrinkOp,
     SurfaceCodeBasePatch,
 )
 from deltakit_compile.dialects.qstruct import OutputOp, ParallelOp, YieldOp
@@ -210,6 +212,134 @@ def handle_measure_operation(
 
 
 @handle_operation.register
+def handle_grow_operation(op: GrowOp, visualisation_data: list[SpaceTimeVisualisationItem]) -> None:
+    """Handle GrowOp for visualisation."""
+    from_patch = cast(SurfaceCodeBasePatch, op.patch.type)
+    to_patch = cast(SurfaceCodeBasePatch, op.res.type)
+    source_id = get_attr_str(op, IN_OP_ID)
+    initial_to_patch_id = get_attr_str(op, OUT_OP_ID)
+    final_to_patch_id = f"{initial_to_patch_id}_end"
+    start_height = get_start_height(op)
+    end_height = get_end_height(op)
+
+    visualisation_data.extend(
+        [
+            # Create a transparent surface with the smaller size
+            {
+                "type": "surface",
+                "id": source_id,
+                "op_name": op.name,
+                "colour": SurfaceColour.NONE,
+                "location": get_patch_location(from_patch),
+                "size": get_patch_size(from_patch),
+                "startHeight": start_height,
+            },
+            # Create a transparent surface with the bigger size
+            {
+                "type": "surface",
+                "id": initial_to_patch_id,
+                "op_name": op.name,
+                "colour": SurfaceColour.NONE,
+                "location": get_patch_location(to_patch),
+                "size": get_patch_size(to_patch),
+                "startHeight": start_height,
+            },
+            # Create a resize operation connecting the smaller and bigger surfaces
+            {
+                "type": "resize",
+                "op_name": op.name,
+                "fromSurfaceId": source_id,
+                "toSurfaceId": initial_to_patch_id,
+            },
+            # Create a transparent surface at the end height of the grown surface
+            {
+                "type": "surface",
+                "id": final_to_patch_id,
+                "op_name": op.name,
+                "colour": SurfaceColour.NONE,
+                "location": get_patch_location(to_patch),
+                "size": get_patch_size(to_patch),
+                "startHeight": end_height,
+            },
+            # Create the sides connecting the initial and final surfaces of the grown patch
+            {
+                "type": "side",
+                "op_name": op.name,
+                "colourScheme": SideColour.set_colour_scheme(get_patch_orientation(to_patch)),
+                "sides": {"+X": True, "-X": True, "+Y": True, "-Y": True},
+                "fromSurfaceId": initial_to_patch_id,
+                "toSurfaceId": final_to_patch_id,
+            },
+        ]
+    )
+
+
+@handle_operation.register
+def handle_shrink_operation(
+    op: ShrinkOp, visualisation_data: list[SpaceTimeVisualisationItem]
+) -> None:
+    """Handle ShrinkOp for visualisation."""
+    from_patch = cast(SurfaceCodeBasePatch, op.patch.type)
+    to_patch = cast(SurfaceCodeBasePatch, op.res.type)
+    source_id = get_attr_str(op, IN_OP_ID)
+    initial_to_patch_id = get_attr_str(op, OUT_OP_ID)
+    final_to_patch_id = f"{initial_to_patch_id}_end"
+    start_height = get_start_height(op)
+    end_height = get_end_height(op)
+
+    visualisation_data.extend(
+        [
+            # Create the initial surface of the patch being shrunk
+            {
+                "type": "surface",
+                "id": source_id,
+                "op_name": op.name,
+                "colour": SurfaceColour.NONE,
+                "location": get_patch_location(from_patch),
+                "size": get_patch_size(from_patch),
+                "startHeight": start_height,
+            },
+            # Create the initial surface of the patch after shrinking
+            {
+                "type": "surface",
+                "id": initial_to_patch_id,
+                "op_name": op.name,
+                "colour": SurfaceColour.NONE,
+                "location": get_patch_location(to_patch),
+                "size": get_patch_size(to_patch),
+                "startHeight": start_height,
+            },
+            # Create a resize operation connecting the initial and final surfaces
+            {
+                "type": "resize",
+                "op_name": op.name,
+                "fromSurfaceId": source_id,
+                "toSurfaceId": initial_to_patch_id,
+            },
+            # Create the final surface of the patch after shrinking
+            {
+                "type": "surface",
+                "id": final_to_patch_id,
+                "op_name": op.name,
+                "colour": SurfaceColour.NONE,
+                "location": get_patch_location(to_patch),
+                "size": get_patch_size(to_patch),
+                "startHeight": end_height,
+            },
+            # Create the sides connecting the initial and final surfaces of the shrunk patch
+            {
+                "type": "side",
+                "op_name": op.name,
+                "colourScheme": SideColour.set_colour_scheme(get_patch_orientation(to_patch)),
+                "sides": {"+X": True, "-X": True, "+Y": True, "-Y": True},
+                "fromSurfaceId": initial_to_patch_id,
+                "toSurfaceId": final_to_patch_id,
+            },
+        ]
+    )
+
+
+@handle_operation.register
 def handle_multi_pauli_measurement(
     op: MultiPauliMeasOp, visualisation_data: list[SpaceTimeVisualisationItem]
 ) -> None:
@@ -339,12 +469,12 @@ def handle_module_operation(
 # Pass implementation
 @dataclass(frozen=True)
 class VisualiseSpacetime(ModulePass):
-    """Deltakit-visualise pass that walks the AST and collects visualisation data."""
+    """Dkit-visualise pass that walks the AST and collects visualisation data."""
 
     name = "visualise-spacetime"
 
     def apply(self, _context, op: ModuleOp) -> None:
-        """Apply the deltakit-visualise pass to the module using single dispatch."""
+        """Apply the dkit-visualise pass to the module using single dispatch."""
         visualisation_data: list[SpaceTimeVisualisationItem] = []
 
         for child in op.walk():

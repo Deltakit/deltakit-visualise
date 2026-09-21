@@ -1,5 +1,5 @@
 # (c) Copyright Riverlane 2025-2026. All rights reserved.
-"""Type definitions for deltakit-visualise."""
+"""Type definitions for dkit-visualise."""
 
 import json
 from typing import Literal, TypedDict
@@ -119,8 +119,17 @@ class SidesData(TypedDict):
     toSurfaceId: str
 
 
+class ResizeData(TypedDict):
+    """Resize visualisation data item."""
+
+    type: Literal["resize"]
+    op_name: str
+    fromSurfaceId: str
+    toSurfaceId: str
+
+
 # Union type for the 3D spacetime visualisation items
-SpaceTimeVisualisationItem = SurfaceData | SidesData
+SpaceTimeVisualisationItem = SurfaceData | SidesData | ResizeData
 
 
 class PlaquetteData(TypedDict):
