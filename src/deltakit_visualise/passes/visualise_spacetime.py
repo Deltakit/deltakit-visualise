@@ -266,9 +266,7 @@ def handle_resize_operation(
             {
                 "type": "side",
                 "op_name": op.name,
-                "colourScheme": SideColour.set_colour_scheme(
-                    get_patch_orientation(to_patch)
-                ),
+                "colourScheme": SideColour.set_colour_scheme(get_patch_orientation(to_patch)),
                 "sides": {"+X": True, "-X": True, "+Y": True, "-Y": True},
                 "fromSurfaceId": initial_to_patch_id,
                 "toSurfaceId": final_to_patch_id,
