@@ -37,8 +37,8 @@ def get_visualisation_data(
     """Read the visualisation data a terminal pass stored on ``module``.
 
     A visualisation pipeline's final passes writes outputs to the module
-    under either :data:`dkit_visualise.constants.VISUALISE_SPACETIME_DATA` (spacetime)
-    or :data:`dkit_visualise.constants.PATCH_VISUALISATION_DATA` (logical patch). This
+    under either :data:`deltakit_visualise.constants.VISUALISE_SPACETIME_DATA` (spacetime)
+    or :data:`deltakit_visualise.constants.PATCH_VISUALISATION_DATA` (logical patch). This
     returns that payload as ``{"ops": [...]}``, ready to hand to :func:`show`.
 
     Args:

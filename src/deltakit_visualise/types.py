@@ -1,5 +1,5 @@
 # (c) Copyright Riverlane 2025-2026. All rights reserved.
-"""Type definitions for dkit-visualise."""
+"""Type definitions for deltakit-visualise."""
 
 import json
 from typing import Literal, TypedDict

@@ -469,12 +469,12 @@ def handle_module_operation(
 # Pass implementation
 @dataclass(frozen=True)
 class VisualiseSpacetime(ModulePass):
-    """Dkit-visualise pass that walks the AST and collects visualisation data."""
+    """Deltakit-visualise pass that walks the AST and collects visualisation data."""
 
     name = "visualise-spacetime"
 
     def apply(self, _context, op: ModuleOp) -> None:
-        """Apply the dkit-visualise pass to the module using single dispatch."""
+        """Apply the deltakit-visualise pass to the module using single dispatch."""
         visualisation_data: list[SpaceTimeVisualisationItem] = []
 
         for child in op.walk():
