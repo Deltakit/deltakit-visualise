@@ -31,13 +31,12 @@ from deltakit_visualise.constants import (
 from deltakit_visualise.passes.visualise_spacetime import (
     get_end_height,
     get_start_height,
-    handle_grow_operation,
     handle_measure_operation,
     handle_measure_stabiliser,
     handle_multi_pauli_measurement,
     handle_patch_declaration,
     handle_prepare_operation,
-    handle_shrink_operation,
+    handle_resize_operation,
 )
 from deltakit_visualise.types import (
     SideColour,
@@ -205,7 +204,7 @@ class TestHandleMeasStabOp:
 
 
 class TestHandleGrowOp:
-    """Tests for handle_grow_operation handler."""
+    """Tests for GrowOp handling."""
 
     def test_outputs_source_and_destination_geometry(self):
         """Test that GrowOp outputs the geometry of both patch versions."""
@@ -223,7 +222,7 @@ class TestHandleGrowOp:
         op.attributes[OUT_OP_ID] = StringAttr("patch_A_2_")
         visualisation_data: list[SpaceTimeVisualisationItem] = []
 
-        handle_grow_operation(op, visualisation_data)
+        handle_resize_operation(op, visualisation_data)
 
         assert len(visualisation_data) == 5
         small_surface = visualisation_data[0]
@@ -259,7 +258,7 @@ class TestHandleGrowOp:
 
 
 class TestHandleShrinkOp:
-    """Tests for handle_shrink_operation handler."""
+    """Tests for ShrinkOp handling."""
 
     def test_outputs_source_and_destination_geometry(self):
         """Test that ShrinkOp outputs the geometry of both patch versions."""
@@ -277,7 +276,7 @@ class TestHandleShrinkOp:
         op.attributes[OUT_OP_ID] = StringAttr("patch_A_2_")
         visualisation_data: list[SpaceTimeVisualisationItem] = []
 
-        handle_shrink_operation(op, visualisation_data)
+        handle_resize_operation(op, visualisation_data)
 
         assert len(visualisation_data) == 5
         big_surface = visualisation_data[0]
