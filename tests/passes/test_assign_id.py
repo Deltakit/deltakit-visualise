@@ -6,7 +6,12 @@ from unittest.mock import MagicMock
 import pytest
 from deltakit_compile.dialects.logical_assembly import (
     MeasStabOp,
+    OrientationEnum,
+    PlacementAttr,
+    RotatedPlanarPatchType,
+    StepOp,
 )
+from xdsl.dialects import test
 from xdsl.dialects.builtin import ArrayAttr, ModuleOp, StringAttr
 from xdsl.ir import Operation
 
@@ -26,6 +31,7 @@ from tests.conftest import (
     MakeMeasure,
     MakeMultiPauliMeas,
     MakePreparedPatch,
+    make_size,
 )
 
 
@@ -372,6 +378,29 @@ class TestAssignIdMultiPauli:
 
         # meas_stab_post should have a distinct OUT_OP_ID
         assert _get_out_id(meas_stab_post) != _get_in_id(meas_stab_post)
+
+
+class TestAssignIdStep:
+    """Tests for AssignId pass with StepOp."""
+
+    def test_step_has_non_empty_in_and_out_ids(self) -> None:
+        """Test that StepOp gets IDs for both connected surfaces."""
+        start_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        end_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([1, 0], OrientationEnum.VERTICAL_Z)
+        )
+        patch = test.TestOp(result_types=[start_type]).res[0]
+        step = StepOp(patch, end_type)
+
+        AssignId().apply(None, ModuleOp([step]))
+
+        in_id = _get_in_id(step)
+        out_id = _get_out_id(step)
+        assert in_id
+        assert out_id
+        assert in_id != out_id
 
 
 class TestAssignIdConsecutiveMeasStab:

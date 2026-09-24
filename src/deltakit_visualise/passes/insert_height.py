@@ -1,7 +1,6 @@
 # (c) Copyright Riverlane 2025-2026. All rights reserved.
 """
-Compiler pass that walks the AST to insert START_HEIGHT_ATTR and END_HEIGHT_ATTR
-attributes into Ops.
+Compiler pass that walks the AST to insert START_HEIGHT_ATTR and END_HEIGHT_ATTR attributes into Ops.
 
 Height tracking uses an increasing counter. Each operation is placed immediately
 after the previous one. ParallelOp children are synchronised so that all regions
@@ -19,6 +18,7 @@ from deltakit_compile.dialects.logical_assembly import (
     PatchDeclarationOp,
     PrepareOp,
     ShrinkOp,
+    StepOp,
 )
 from deltakit_compile.dialects.qstruct import ParallelOp
 from xdsl.dialects.builtin import Float64Type, FloatAttr, ModuleOp
@@ -84,7 +84,9 @@ def handle_parallel_height(op: ParallelOp, tracker: HeightTracker) -> None:
 
 
 @insert_height.register
-def handle_patch_declaration_height(op: PatchDeclarationOp, tracker: HeightTracker) -> None:
+def handle_patch_declaration_height(
+    op: PatchDeclarationOp, tracker: HeightTracker
+) -> None:
     """PatchDeclarationOp occupies DEFAULT_HEIGHT_COST height units."""
     start, end = tracker.consume(DEFAULT_HEIGHT_COST)
     op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
@@ -132,9 +134,19 @@ def handle_measure_height(op: MeasureOp, tracker: HeightTracker) -> None:
 
 
 @insert_height.register
-def handle_multi_pauli_meas_height(op: MultiPauliMeasOp, tracker: HeightTracker) -> None:
+def handle_multi_pauli_meas_height(
+    op: MultiPauliMeasOp, tracker: HeightTracker
+) -> None:
     """MultiPauliMeasOp occupies *rounds* height units."""
     start, end = tracker.consume(op.rounds.data)
+    op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
+    op.attributes[END_HEIGHT_ATTR] = FloatAttr(end, Float64Type())
+
+
+@insert_height.register
+def handle_step_height(op: StepOp, tracker: HeightTracker) -> None:
+    """StepOp advances the visualisation by one height unit."""
+    start, end = tracker.consume(1.0)
     op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
     op.attributes[END_HEIGHT_ATTR] = FloatAttr(end, Float64Type())
 

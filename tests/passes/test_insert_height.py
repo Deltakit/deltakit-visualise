@@ -8,8 +8,10 @@ from deltakit_compile.dialects.logical_assembly import (
     OrientationEnum,
     PlacementAttr,
     RotatedPlanarPatchType,
+    StepOp,
 )
 from deltakit_compile.dialects.qstruct import ParallelOp, YieldOp
+from xdsl.dialects import test
 from xdsl.dialects.builtin import FloatAttr, ModuleOp
 from xdsl.ir import Block, Operation, Region
 
@@ -74,7 +76,7 @@ class TestInsertHeightSimpleChain:
         ],
     )
     # PLR0913: suppresses "too many arguments" - needed for fixtures + parametrise
-    def test_single_chain_heights(
+    def test_single_chain_heights(  # noqa: PLR0913
         self,
         make_prepared_patch: MakePreparedPatch,
         make_meas_stab: MakeMeasStab,
@@ -106,7 +108,29 @@ class TestInsertHeightSimpleChain:
         InsertHeight().apply(None, module)
 
         for op_name, expected in expected_heights.items():
-            assert _get_heights(op_map[op_name]) == expected, f"Height mismatch for {op_name}"
+            assert _get_heights(op_map[op_name]) == expected, (
+                f"Height mismatch for {op_name}"
+            )
+
+    def test_step_ops_advance_height_by_one(self) -> None:
+        """Each StepOp starts one height unit after the previous step."""
+        patch_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        next_patch_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([1, 0], OrientationEnum.VERTICAL_Z)
+        )
+        final_patch_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([2, 0], OrientationEnum.VERTICAL_Z)
+        )
+        patch = test.TestOp(result_types=[patch_type]).res[0]
+        first_step = StepOp(patch, next_patch_type)
+        second_step = StepOp(first_step.res, final_patch_type)
+
+        InsertHeight().apply(None, ModuleOp([first_step, second_step]))
+
+        assert _get_heights(first_step) == (0.0, 1.0)
+        assert _get_heights(second_step) == (1.0, 2.0)
 
 
 class TestInsertHeightMultiPauli:
@@ -288,8 +312,7 @@ class TestInsertHeightConsecutiveMeasStab:
         meas_stab_a2 = make_meas_stab(meas_stab_a1.res, 3)
 
         # Patch B operations: declare -> prepare -> meas_stab(2) -> meas_stab(4) -> meas_stab(6)
-        # Sequential: declare_b (8,8), prepare_b (8,8), meas_stab_b1 (8,10),
-        # meas_stab_b2 (10,14), meas_stab_b3 (14,20)
+        # Sequential: declare_b (8,8), prepare_b (8,8), meas_stab_b1 (8,10), meas_stab_b2 (10,14), meas_stab_b3 (14,20)
         meas_stab_b1 = make_meas_stab(patch_b.prepare.res, 2)
         meas_stab_b2 = make_meas_stab(meas_stab_b1.res, 4)
         meas_stab_b3 = make_meas_stab(meas_stab_b2.res, 6)
@@ -339,8 +362,12 @@ class TestInsertHeightParallelOp:
         meas_stab_b = make_meas_stab(patch_b.prepare.res, 10)
 
         # Build two parallel regions with equal heights
-        region_a = Region(Block([patch_a.patch_dec, patch_a.prepare, meas_stab_a, YieldOp()]))
-        region_b = Region(Block([patch_b.patch_dec, patch_b.prepare, meas_stab_b, YieldOp()]))
+        region_a = Region(
+            Block([patch_a.patch_dec, patch_a.prepare, meas_stab_a, YieldOp()])
+        )
+        region_b = Region(
+            Block([patch_b.patch_dec, patch_b.prepare, meas_stab_b, YieldOp()])
+        )
         parallel_op = ParallelOp(result_types=[], par_regions=[region_a, region_b])
 
         module = ModuleOp([parallel_op])
@@ -370,15 +397,21 @@ class TestInsertHeightParallelOp:
         # Region B: meas_stab(5) -> end height = 5
         meas_stab_b = make_meas_stab(patch_b.prepare.res, 5)
 
-        region_a = Region(Block([patch_a.patch_dec, patch_a.prepare, meas_stab_a, YieldOp()]))
-        region_b = Region(Block([patch_b.patch_dec, patch_b.prepare, meas_stab_b, YieldOp()]))
+        region_a = Region(
+            Block([patch_a.patch_dec, patch_a.prepare, meas_stab_a, YieldOp()])
+        )
+        region_b = Region(
+            Block([patch_b.patch_dec, patch_b.prepare, meas_stab_b, YieldOp()])
+        )
         parallel_op = ParallelOp(result_types=[], par_regions=[region_a, region_b])
 
         # Operation after the ParallelOp should start at max(10, 5) = 10
         post_patch = make_prepared_patch()
         meas_stab_post = make_meas_stab(post_patch.prepare.res, 3)
 
-        module = ModuleOp([parallel_op, post_patch.patch_dec, post_patch.prepare, meas_stab_post])
+        module = ModuleOp(
+            [parallel_op, post_patch.patch_dec, post_patch.prepare, meas_stab_post]
+        )
         InsertHeight().apply(None, module)
 
         # Region A
@@ -407,11 +440,17 @@ class TestInsertHeightParallelOp:
         meas_stab_a = make_meas_stab(patch_a.prepare.res, 4)
         meas_stab_b = make_meas_stab(patch_b.prepare.res, 6)
 
-        region_a = Region(Block([patch_a.patch_dec, patch_a.prepare, meas_stab_a, YieldOp()]))
-        region_b = Region(Block([patch_b.patch_dec, patch_b.prepare, meas_stab_b, YieldOp()]))
+        region_a = Region(
+            Block([patch_a.patch_dec, patch_a.prepare, meas_stab_a, YieldOp()])
+        )
+        region_b = Region(
+            Block([patch_b.patch_dec, patch_b.prepare, meas_stab_b, YieldOp()])
+        )
         parallel_op = ParallelOp(result_types=[], par_regions=[region_a, region_b])
 
-        module = ModuleOp([pre_patch.patch_dec, pre_patch.prepare, meas_stab_pre, parallel_op])
+        module = ModuleOp(
+            [pre_patch.patch_dec, pre_patch.prepare, meas_stab_pre, parallel_op]
+        )
         InsertHeight().apply(None, module)
 
         # Pre-parallel operations
@@ -465,8 +504,12 @@ class TestInsertHeightParallelOp:
         meas_stab_a = make_meas_stab(patch_a.prepare.res, 5)
         meas_stab_b = make_meas_stab(patch_b.prepare.res, 3)
 
-        region_a = Region(Block([patch_a.patch_dec, patch_a.prepare, meas_stab_a, YieldOp()]))
-        region_b = Region(Block([patch_b.patch_dec, patch_b.prepare, meas_stab_b, YieldOp()]))
+        region_a = Region(
+            Block([patch_a.patch_dec, patch_a.prepare, meas_stab_a, YieldOp()])
+        )
+        region_b = Region(
+            Block([patch_b.patch_dec, patch_b.prepare, meas_stab_b, YieldOp()])
+        )
         parallel_op = ParallelOp(result_types=[], par_regions=[region_a, region_b])
 
         module = ModuleOp([parallel_op])

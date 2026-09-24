@@ -13,6 +13,7 @@ from deltakit_compile.dialects.logical_assembly import (
     PrepareOp,
     RotatedPlanarPatchType,
     ShrinkOp,
+    StepOp,
 )
 from deltakit_compile.dialects.qcore import PauliAttr
 from xdsl.dialects import test
@@ -31,12 +32,15 @@ from deltakit_visualise.constants import (
 from deltakit_visualise.passes.visualise_spacetime import (
     get_end_height,
     get_start_height,
+    handle_grow_operation,
     handle_measure_operation,
     handle_measure_stabiliser,
     handle_multi_pauli_measurement,
+    handle_operation,
     handle_patch_declaration,
     handle_prepare_operation,
-    handle_resize_operation,
+    handle_shrink_operation,
+    handle_step_operation,
 )
 from deltakit_visualise.types import (
     SideColour,
@@ -70,11 +74,13 @@ class TestHeightAttributes:
         op = PatchDeclarationOp(patch_type)
         # Do not set END_HEIGHT_ATTR
 
-        with pytest.raises(ValueError, match=r"is missing a valid visualise\.end_height attribute"):
+        with pytest.raises(
+            ValueError, match=r"is missing a valid visualise\.end_height attribute"
+        ):
             get_end_height(op)
 
     def test_handle_patch_declaration_missing_start_height_raises_error(self):
-        """Test missing START_HEIGHT_ATTR raises ValueError."""
+        """Test that handle_patch_declaration raises ValueError when START_HEIGHT_ATTR is missing."""
         patch_type = RotatedPlanarPatchType(
             make_size(5, 5), PlacementAttr([1, 1], OrientationEnum.VERTICAL_Z)
         )
@@ -169,7 +175,9 @@ class TestHandleMeasStabOp:
         expected_colours: tuple[SideColour, SideColour],
     ):
         """Test that MeasStabOp with placement outputs correctly coloured sides."""
-        patch_type = RotatedPlanarPatchType(make_size(5, 5), PlacementAttr([1, 1], orientation))
+        patch_type = RotatedPlanarPatchType(
+            make_size(5, 5), PlacementAttr([1, 1], orientation)
+        )
         patch = test.TestOp(result_types=[patch_type]).res[0]
         op = MeasStabOp(patch, 10)
         op.attributes[START_HEIGHT_ATTR] = IntAttr(0)
@@ -204,7 +212,7 @@ class TestHandleMeasStabOp:
 
 
 class TestHandleGrowOp:
-    """Tests for GrowOp handling."""
+    """Tests for handle_grow_operation handler."""
 
     def test_outputs_source_and_destination_geometry(self):
         """Test that GrowOp outputs the geometry of both patch versions."""
@@ -222,7 +230,7 @@ class TestHandleGrowOp:
         op.attributes[OUT_OP_ID] = StringAttr("patch_A_2_")
         visualisation_data: list[SpaceTimeVisualisationItem] = []
 
-        handle_resize_operation(op, visualisation_data)
+        handle_grow_operation(op, visualisation_data)
 
         assert len(visualisation_data) == 5
         small_surface = visualisation_data[0]
@@ -258,7 +266,7 @@ class TestHandleGrowOp:
 
 
 class TestHandleShrinkOp:
-    """Tests for ShrinkOp handling."""
+    """Tests for handle_shrink_operation handler."""
 
     def test_outputs_source_and_destination_geometry(self):
         """Test that ShrinkOp outputs the geometry of both patch versions."""
@@ -276,7 +284,7 @@ class TestHandleShrinkOp:
         op.attributes[OUT_OP_ID] = StringAttr("patch_A_2_")
         visualisation_data: list[SpaceTimeVisualisationItem] = []
 
-        handle_resize_operation(op, visualisation_data)
+        handle_shrink_operation(op, visualisation_data)
 
         assert len(visualisation_data) == 5
         big_surface = visualisation_data[0]
@@ -348,8 +356,7 @@ class TestHandleMultiPauliMeasurement:
 
         handle_multi_pauli_measurement(op, visualisation_data)
 
-        # Output: 2 logical (start surface + sides + end surface each) +
-        # 1 bridge (surface + sides + surface) = 9
+        # Output: 2 logical (start surface + sides + end surface each) + 1 bridge (surface + sides + surface) = 9
         assert len(visualisation_data) == 9
 
         # Check sides data
@@ -493,6 +500,82 @@ class TestHandleMultiPauliMeasurement:
 
         with pytest.raises(ValueError, match="Unsupported basis combination"):
             handle_multi_pauli_measurement(op, visualisation_data)
+
+
+class TestHandleStepOperation:
+    """Tests for handle_step_operation handler."""
+
+    def test_registered_for_step_op(self):
+        """Test that StepOp dispatches to its visualisation handler."""
+        assert handle_operation.dispatch(StepOp) is handle_step_operation
+
+    @pytest.mark.parametrize(
+        ("orientation", "expected_surface_colour", "expected_side_scheme"),
+        [
+            (
+                OrientationEnum.VERTICAL_Z,
+                SurfaceColour.BLUE,
+                (SideColour.RED, SideColour.BLUE),
+            ),
+            (
+                OrientationEnum.HORIZONTAL_Z,
+                SurfaceColour.RED,
+                (SideColour.BLUE, SideColour.RED),
+            ),
+        ],
+    )
+    def test_outputs_coloured_surfaces_and_sides(
+        self,
+        orientation: OrientationEnum,
+        expected_surface_colour: SurfaceColour,
+        expected_side_scheme: tuple[SideColour, SideColour],
+    ):
+        """Test that StepOp outputs coloured surfaces and oriented sides."""
+        start_type = RotatedPlanarPatchType(
+            make_size(5, 5), PlacementAttr([1, 1], orientation)
+        )
+        end_type = RotatedPlanarPatchType(
+            make_size(5, 5), PlacementAttr([1.5, 0.5], orientation)
+        )
+        patch = test.TestOp(result_types=[start_type]).res[0]
+        op = StepOp(patch, end_type)
+        op.attributes[START_HEIGHT_ATTR] = IntAttr(2)
+        op.attributes[END_HEIGHT_ATTR] = IntAttr(3)
+        op.attributes[IN_OP_ID] = StringAttr("patch_A_2_")
+        op.attributes[OUT_OP_ID] = StringAttr("patch_A_3_")
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+
+        handle_step_operation(op, visualisation_data)
+
+        assert len(visualisation_data) == 3
+        assert visualisation_data[1]["type"] == "step"
+        assert visualisation_data[0]["colour"] == expected_surface_colour
+        assert visualisation_data[1]["colourScheme"] == expected_side_scheme
+        assert visualisation_data[2]["colour"] == expected_surface_colour
+
+    @pytest.mark.parametrize("end_location", [(2, 0.5), (1.5, 1)])
+    def test_accepts_arbitrary_displacement(
+        self, end_location: tuple[float, float]
+    ) -> None:
+        """Test that step visualisation accepts arbitrary patch offsets."""
+        patch_type = RotatedPlanarPatchType(
+            make_size(5, 5), PlacementAttr([1, 1], OrientationEnum.VERTICAL_Z)
+        )
+        end_type = RotatedPlanarPatchType(
+            make_size(5, 5), PlacementAttr(end_location, OrientationEnum.VERTICAL_Z)
+        )
+        patch = test.TestOp(result_types=[patch_type]).res[0]
+        op = StepOp(patch, end_type)
+        op.attributes[START_HEIGHT_ATTR] = IntAttr(2)
+        op.attributes[END_HEIGHT_ATTR] = IntAttr(3)
+        op.attributes[IN_OP_ID] = StringAttr("patch_A_2_")
+        op.attributes[OUT_OP_ID] = StringAttr("patch_A_3_")
+
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+        handle_step_operation(op, visualisation_data)
+
+        assert len(visualisation_data) == 3
+        assert visualisation_data[2]["location"] == end_location
 
 
 class TestHandleMeasureOperation:
