@@ -311,6 +311,53 @@ class TestHandleShrinkOp:
         assert sides["toSurfaceId"] == "patch_A_2__end"
 
 
+class TestHandleGrowShrinkRoundTrip:
+    """Tests for growing and shrinking the same patch."""
+
+    def test_grow_and_shrink_left_and_bottom_restores_original_geometry(self):
+        """Test that resizing left and bottom by four restores the original patch."""
+        original_type = RotatedPlanarPatchType(
+            make_size(4, 4), PlacementAttr([4, 4], OrientationEnum.VERTICAL_Z)
+        )
+        grown_type = RotatedPlanarPatchType(
+            make_size(8, 8), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        patch = test.TestOp(result_types=[original_type]).res[0]
+        grow_op = GrowOp(patch, 4, grown_type)
+        grow_op.attributes[START_HEIGHT_ATTR] = IntAttr(0)
+        grow_op.attributes[END_HEIGHT_ATTR] = IntAttr(4)
+        grow_op.attributes[IN_OP_ID] = StringAttr("patch_A_0_")
+        grow_op.attributes[OUT_OP_ID] = StringAttr("patch_A_1_")
+        shrink_op = ShrinkOp(grow_op.res, 4, original_type)
+        shrink_op.attributes[START_HEIGHT_ATTR] = IntAttr(4)
+        shrink_op.attributes[END_HEIGHT_ATTR] = IntAttr(8)
+        shrink_op.attributes[IN_OP_ID] = StringAttr("patch_A_1__end")
+        shrink_op.attributes[OUT_OP_ID] = StringAttr("patch_A_2_")
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+
+        handle_resize_operation(grow_op, visualisation_data)
+        handle_resize_operation(shrink_op, visualisation_data)
+
+        assert len(visualisation_data) == 10
+        original_surface = visualisation_data[0]
+        grown_surface = visualisation_data[3]
+        shrink_source_surface = visualisation_data[5]
+        final_surface = visualisation_data[8]
+        assert original_surface["type"] == "surface"
+        assert original_surface["size"] == (4, 4)
+        assert original_surface["location"] == (4, 4)
+        assert grown_surface["type"] == "surface"
+        assert grown_surface["size"] == (8, 8)
+        assert grown_surface["location"] == (0, 0)
+        assert shrink_source_surface["type"] == "surface"
+        assert shrink_source_surface["size"] == grown_surface["size"]
+        assert shrink_source_surface["location"] == grown_surface["location"]
+        assert final_surface["type"] == "surface"
+        assert final_surface["startHeight"] == 8.0
+        assert final_surface["size"] == original_surface["size"]
+        assert final_surface["location"] == original_surface["location"]
+
+
 class TestHandleMultiPauliMeasurement:
     """Tests for handle_multi_pauli_measurement handler."""
 
