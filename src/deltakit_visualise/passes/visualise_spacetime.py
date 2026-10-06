@@ -230,6 +230,7 @@ def handle_resize_operation(
 
     visualisation_data.extend(
         [
+            # Add a transparent surface at the start of the resize operation
             {
                 "type": "surface",
                 "id": source_id,
@@ -239,6 +240,7 @@ def handle_resize_operation(
                 "size": get_patch_size(from_patch),
                 "startHeight": start_height,
             },
+            # Add a transparent surface for the initial state of the target patch
             {
                 "type": "surface",
                 "id": initial_to_patch_id,
@@ -248,12 +250,14 @@ def handle_resize_operation(
                 "size": get_patch_size(to_patch),
                 "startHeight": start_height,
             },
+            # Add a resize operation showing patch growing or shrinking to its final size
             {
                 "type": "resize",
                 "op_name": op.name,
                 "fromSurfaceId": source_id,
                 "toSurfaceId": initial_to_patch_id,
             },
+            # Add a transparent surface for the final state of the target patch
             {
                 "type": "surface",
                 "id": final_to_patch_id,
@@ -263,6 +267,7 @@ def handle_resize_operation(
                 "size": get_patch_size(to_patch),
                 "startHeight": end_height,
             },
+            # Add sides to visually connect the initial and final states of the target patch
             {
                 "type": "side",
                 "op_name": op.name,
