@@ -78,7 +78,8 @@ class TestHeightAttributes:
             get_end_height(op)
 
     def test_handle_patch_declaration_missing_start_height_raises_error(self):
-        """Test that handle_patch_declaration raises ValueError when START_HEIGHT_ATTR is missing."""
+        """Test that handle_patch_declaration raises ValueError when START_HEIGHT_ATTR
+        is missing."""
         patch_type = RotatedPlanarPatchType(
             make_size(5, 5), PlacementAttr([1, 1], OrientationEnum.VERTICAL_Z)
         )
@@ -352,7 +353,8 @@ class TestHandleMultiPauliMeasurement:
 
         handle_multi_pauli_measurement(op, visualisation_data)
 
-        # Output: 2 logical (start surface + sides + end surface each) + 1 bridge (surface + sides + surface) = 9
+        # Output: 2 logical (start surface + sides + end surface each) +
+        # 1 bridge (surface + sides + surface) = 9
         assert len(visualisation_data) == 9
 
         # Check sides data
