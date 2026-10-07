@@ -55,9 +55,7 @@ def get_visualisation_data(
         PATCH_VISUALISATION_DATA
     )
     visualisation_type = (
-        f"{SPACE_TIME}"
-        if module.attributes.get(VISUALISE_SPACETIME_DATA)
-        else f"{LOGICAL_PATCH}"
+        f"{SPACE_TIME}" if module.attributes.get(VISUALISE_SPACETIME_DATA) else f"{LOGICAL_PATCH}"
     )
     if attr is None:
         msg = (

@@ -3,6 +3,7 @@
 
 import pytest
 from deltakit_compile.dialects.logical_assembly import (
+    GrowOp,
     MeasStabOp,
     MeasureOp,
     MultiPauliMeasOp,
@@ -73,9 +74,7 @@ class TestHeightAttributes:
         op = PatchDeclarationOp(patch_type)
         # Do not set END_HEIGHT_ATTR
 
-        with pytest.raises(
-            ValueError, match=r"is missing a valid visualise\.end_height attribute"
-        ):
+        with pytest.raises(ValueError, match=r"is missing a valid visualise\.end_height attribute"):
             get_end_height(op)
 
     def test_handle_patch_declaration_missing_start_height_raises_error(self):
@@ -175,9 +174,7 @@ class TestHandleMeasStabOp:
         expected_colours: tuple[SideColour, SideColour],
     ):
         """Test that MeasStabOp with placement outputs correctly coloured sides."""
-        patch_type = RotatedPlanarPatchType(
-            make_size(5, 5), PlacementAttr([1, 1], orientation)
-        )
+        patch_type = RotatedPlanarPatchType(make_size(5, 5), PlacementAttr([1, 1], orientation))
         patch = test.TestOp(result_types=[patch_type]).res[0]
         op = MeasStabOp(patch, 10)
         op.attributes[START_HEIGHT_ATTR] = IntAttr(0)
@@ -356,7 +353,8 @@ class TestHandleMultiPauliMeasurement:
 
         handle_multi_pauli_measurement(op, visualisation_data)
 
-        # Output: 2 logical (start surface + sides + end surface each) + 1 bridge (surface + sides + surface) = 9
+        # Output: 2 logical (start surface + sides + end surface each) +
+        # 1 bridge (surface + sides + surface) = 9
         assert len(visualisation_data) == 9
 
         # Check sides data
