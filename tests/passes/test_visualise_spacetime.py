@@ -569,6 +569,54 @@ class TestHandleStepOperation:
         assert len(visualisation_data) == 3
         assert visualisation_data[2]["location"] == end_location
 
+    def test_four_steps_restore_initial_patch_geometry(self):
+        """Test that four offset steps return a 4x4 patch to its initial geometry."""
+        initial_location = (1.0, 1.0)
+        initial_type = RotatedPlanarPatchType(
+            make_size(4, 4), PlacementAttr(initial_location, OrientationEnum.VERTICAL_Z)
+        )
+        patch = test.TestOp(result_types=[initial_type]).res[0]
+        step_deltas = [(0.5, -0.5), (0.5, -0.5), (-0.5, 0.5), (-0.5, 0.5)]
+        expected_locations = [
+            (1.5, 0.5),
+            (2.0, 0.0),
+            (1.5, 0.5),
+            initial_location,
+        ]
+        step_operations = []
+        current_patch = patch
+        current_location = initial_location
+        input_id = "patch_initial"
+
+        for index, (delta_x, delta_y) in enumerate(step_deltas, start=1):
+            current_location = (current_location[0] + delta_x, current_location[1] + delta_y)
+            destination_type = RotatedPlanarPatchType(
+                make_size(4, 4),
+                PlacementAttr(current_location, OrientationEnum.VERTICAL_Z),
+            )
+            step_op = StepOp(current_patch, destination_type)
+            output_id = f"patch_step_{index}"
+            step_op.attributes[START_HEIGHT_ATTR] = IntAttr(index - 1)
+            step_op.attributes[END_HEIGHT_ATTR] = IntAttr(index)
+            step_op.attributes[IN_OP_ID] = StringAttr(input_id)
+            step_op.attributes[OUT_OP_ID] = StringAttr(output_id)
+            step_operations.append(step_op)
+            current_patch = step_op.res
+            input_id = output_id
+
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+        for step_op in step_operations:
+            handle_step_operation(step_op, visualisation_data)
+
+        initial_surface = visualisation_data[0]
+        final_surface = visualisation_data[-1]
+        actual_step_locations = [
+            visualisation_data[index * 3 + 2]["location"] for index in range(4)
+        ]
+
+        assert actual_step_locations == expected_locations
+        assert final_surface["location"] == initial_surface["location"]
+        assert final_surface["size"] == initial_surface["size"]
 
 class TestHandleMeasureOperation:
     """Tests for handle_measure_operation handler."""
