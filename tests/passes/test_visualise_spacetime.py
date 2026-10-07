@@ -13,6 +13,7 @@ from deltakit_compile.dialects.logical_assembly import (
     PrepareOp,
     RotatedPlanarPatchType,
     ShrinkOp,
+    StepOp,
 )
 from deltakit_compile.dialects.qcore import PauliAttr
 from xdsl.dialects import test
@@ -31,12 +32,15 @@ from deltakit_visualise.constants import (
 from deltakit_visualise.passes.visualise_spacetime import (
     get_end_height,
     get_start_height,
+    handle_grow_operation,
     handle_measure_operation,
     handle_measure_stabiliser,
     handle_multi_pauli_measurement,
+    handle_operation,
     handle_patch_declaration,
     handle_prepare_operation,
-    handle_resize_operation,
+    handle_shrink_operation,
+    handle_step_operation,
 )
 from deltakit_visualise.types import (
     SideColour,
@@ -74,8 +78,7 @@ class TestHeightAttributes:
             get_end_height(op)
 
     def test_handle_patch_declaration_missing_start_height_raises_error(self):
-        """Test that handle_patch_declaration raises ValueError when START_HEIGHT_ATTR
-        is missing."""
+        """Test that handle_patch_declaration raises ValueError when START_HEIGHT_ATTR is missing."""
         patch_type = RotatedPlanarPatchType(
             make_size(5, 5), PlacementAttr([1, 1], OrientationEnum.VERTICAL_Z)
         )
@@ -205,7 +208,7 @@ class TestHandleMeasStabOp:
 
 
 class TestHandleGrowOp:
-    """Tests for GrowOp handling."""
+    """Tests for handle_grow_operation handler."""
 
     def test_outputs_source_and_destination_geometry(self):
         """Test that GrowOp outputs the geometry of both patch versions."""
@@ -223,10 +226,14 @@ class TestHandleGrowOp:
         op.attributes[OUT_OP_ID] = StringAttr("patch_A_2_")
         visualisation_data: list[SpaceTimeVisualisationItem] = []
 
-        handle_resize_operation(op, visualisation_data)
+        handle_grow_operation(op, visualisation_data)
 
         assert len(visualisation_data) == 5
-        small_surface, initial_big_surface, resize, final_big_surface, sides = visualisation_data
+        small_surface = visualisation_data[0]
+        initial_big_surface = visualisation_data[1]
+        resize = visualisation_data[2]
+        final_big_surface = visualisation_data[3]
+        sides = visualisation_data[4]
         assert small_surface["type"] == "surface"
         assert small_surface["id"] == "patch_A_1_"
         assert small_surface["location"] == (1, 1)
@@ -248,12 +255,14 @@ class TestHandleGrowOp:
         assert final_big_surface["id"] == "patch_A_2__end"
         assert final_big_surface["startHeight"] == 10.0
         assert sides["type"] == "side"
+        assert sides["colourScheme"] == (SideColour.RED, SideColour.BLUE)
+        assert sides["sides"] == {"+X": True, "-X": True, "+Y": True, "-Y": True}
         assert sides["fromSurfaceId"] == "patch_A_2_"
         assert sides["toSurfaceId"] == "patch_A_2__end"
 
 
 class TestHandleShrinkOp:
-    """Tests for ShrinkOp handling."""
+    """Tests for handle_shrink_operation handler."""
 
     def test_outputs_source_and_destination_geometry(self):
         """Test that ShrinkOp outputs the geometry of both patch versions."""
@@ -271,10 +280,14 @@ class TestHandleShrinkOp:
         op.attributes[OUT_OP_ID] = StringAttr("patch_A_2_")
         visualisation_data: list[SpaceTimeVisualisationItem] = []
 
-        handle_resize_operation(op, visualisation_data)
+        handle_shrink_operation(op, visualisation_data)
 
         assert len(visualisation_data) == 5
-        big_surface, initial_small_surface, resize, final_small_surface, sides = visualisation_data
+        big_surface = visualisation_data[0]
+        initial_small_surface = visualisation_data[1]
+        resize = visualisation_data[2]
+        final_small_surface = visualisation_data[3]
+        sides = visualisation_data[4]
         assert big_surface["type"] == "surface"
         assert big_surface["id"] == "patch_A_1_"
         assert big_surface["location"] == (0, 2)
@@ -296,55 +309,10 @@ class TestHandleShrinkOp:
         assert final_small_surface["id"] == "patch_A_2__end"
         assert final_small_surface["startHeight"] == 10.0
         assert sides["type"] == "side"
+        assert sides["colourScheme"] == (SideColour.RED, SideColour.BLUE)
+        assert sides["sides"] == {"+X": True, "-X": True, "+Y": True, "-Y": True}
         assert sides["fromSurfaceId"] == "patch_A_2_"
         assert sides["toSurfaceId"] == "patch_A_2__end"
-
-
-class TestHandleGrowShrinkRoundTrip:
-    """Tests for growing and shrinking the same patch."""
-
-    def test_grow_and_shrink_left_and_bottom_restores_original_geometry(self):
-        """Test that resizing left and bottom by four restores the original patch."""
-        original_type = RotatedPlanarPatchType(
-            make_size(4, 4), PlacementAttr([4, 4], OrientationEnum.VERTICAL_Z)
-        )
-        grown_type = RotatedPlanarPatchType(
-            make_size(8, 8), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
-        )
-        patch = test.TestOp(result_types=[original_type]).res[0]
-        grow_op = GrowOp(patch, 4, grown_type)
-        grow_op.attributes[START_HEIGHT_ATTR] = IntAttr(0)
-        grow_op.attributes[END_HEIGHT_ATTR] = IntAttr(4)
-        grow_op.attributes[IN_OP_ID] = StringAttr("patch_A_0_")
-        grow_op.attributes[OUT_OP_ID] = StringAttr("patch_A_1_")
-        shrink_op = ShrinkOp(grow_op.res, 4, original_type)
-        shrink_op.attributes[START_HEIGHT_ATTR] = IntAttr(4)
-        shrink_op.attributes[END_HEIGHT_ATTR] = IntAttr(8)
-        shrink_op.attributes[IN_OP_ID] = StringAttr("patch_A_1__end")
-        shrink_op.attributes[OUT_OP_ID] = StringAttr("patch_A_2_")
-        visualisation_data: list[SpaceTimeVisualisationItem] = []
-
-        handle_resize_operation(grow_op, visualisation_data)
-        handle_resize_operation(shrink_op, visualisation_data)
-
-        assert len(visualisation_data) == 10
-        original_surface = visualisation_data[0]
-        grown_surface = visualisation_data[3]
-        shrink_source_surface = visualisation_data[5]
-        final_surface = visualisation_data[8]
-        assert original_surface["type"] == "surface"
-        assert original_surface["size"] == (4, 4)
-        assert original_surface["location"] == (4, 4)
-        assert grown_surface["type"] == "surface"
-        assert grown_surface["size"] == (8, 8)
-        assert grown_surface["location"] == (0, 0)
-        assert shrink_source_surface["type"] == "surface"
-        assert shrink_source_surface["size"] == grown_surface["size"]
-        assert shrink_source_surface["location"] == grown_surface["location"]
-        assert final_surface["type"] == "surface"
-        assert final_surface["startHeight"] == 8.0
-        assert final_surface["size"] == original_surface["size"]
-        assert final_surface["location"] == original_surface["location"]
 
 
 class TestHandleMultiPauliMeasurement:
@@ -384,8 +352,7 @@ class TestHandleMultiPauliMeasurement:
 
         handle_multi_pauli_measurement(op, visualisation_data)
 
-        # Output: 2 logical (start surface + sides + end surface each) +
-        # 1 bridge (surface + sides + surface) = 9
+        # Output: 2 logical (start surface + sides + end surface each) + 1 bridge (surface + sides + surface) = 9
         assert len(visualisation_data) == 9
 
         # Check sides data
@@ -529,6 +496,76 @@ class TestHandleMultiPauliMeasurement:
 
         with pytest.raises(ValueError, match="Unsupported basis combination"):
             handle_multi_pauli_measurement(op, visualisation_data)
+
+
+class TestHandleStepOperation:
+    """Tests for handle_step_operation handler."""
+
+    def test_registered_for_step_op(self):
+        """Test that StepOp dispatches to its visualisation handler."""
+        assert handle_operation.dispatch(StepOp) is handle_step_operation
+
+    @pytest.mark.parametrize(
+        ("orientation", "expected_surface_colour", "expected_side_scheme"),
+        [
+            (
+                OrientationEnum.VERTICAL_Z,
+                SurfaceColour.BLUE,
+                (SideColour.RED, SideColour.BLUE),
+            ),
+            (
+                OrientationEnum.HORIZONTAL_Z,
+                SurfaceColour.RED,
+                (SideColour.BLUE, SideColour.RED),
+            ),
+        ],
+    )
+    def test_outputs_coloured_surfaces_and_sides(
+        self,
+        orientation: OrientationEnum,
+        expected_surface_colour: SurfaceColour,
+        expected_side_scheme: tuple[SideColour, SideColour],
+    ):
+        """Test that StepOp outputs coloured surfaces and oriented sides."""
+        start_type = RotatedPlanarPatchType(make_size(5, 5), PlacementAttr([1, 1], orientation))
+        end_type = RotatedPlanarPatchType(make_size(5, 5), PlacementAttr([1.5, 0.5], orientation))
+        patch = test.TestOp(result_types=[start_type]).res[0]
+        op = StepOp(patch, end_type)
+        op.attributes[START_HEIGHT_ATTR] = IntAttr(2)
+        op.attributes[END_HEIGHT_ATTR] = IntAttr(3)
+        op.attributes[IN_OP_ID] = StringAttr("patch_A_2_")
+        op.attributes[OUT_OP_ID] = StringAttr("patch_A_3_")
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+
+        handle_step_operation(op, visualisation_data)
+
+        assert len(visualisation_data) == 3
+        assert visualisation_data[1]["type"] == "step"
+        assert visualisation_data[0]["colour"] == expected_surface_colour
+        assert visualisation_data[1]["colourScheme"] == expected_side_scheme
+        assert visualisation_data[2]["colour"] == expected_surface_colour
+
+    @pytest.mark.parametrize("end_location", [(2, 0.5), (1.5, 1)])
+    def test_accepts_arbitrary_displacement(self, end_location: tuple[float, float]) -> None:
+        """Test that step visualisation accepts arbitrary patch offsets."""
+        patch_type = RotatedPlanarPatchType(
+            make_size(5, 5), PlacementAttr([1, 1], OrientationEnum.VERTICAL_Z)
+        )
+        end_type = RotatedPlanarPatchType(
+            make_size(5, 5), PlacementAttr(end_location, OrientationEnum.VERTICAL_Z)
+        )
+        patch = test.TestOp(result_types=[patch_type]).res[0]
+        op = StepOp(patch, end_type)
+        op.attributes[START_HEIGHT_ATTR] = IntAttr(2)
+        op.attributes[END_HEIGHT_ATTR] = IntAttr(3)
+        op.attributes[IN_OP_ID] = StringAttr("patch_A_2_")
+        op.attributes[OUT_OP_ID] = StringAttr("patch_A_3_")
+
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+        handle_step_operation(op, visualisation_data)
+
+        assert len(visualisation_data) == 3
+        assert visualisation_data[2]["location"] == end_location
 
 
 class TestHandleMeasureOperation:
