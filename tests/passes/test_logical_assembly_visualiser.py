@@ -351,9 +351,7 @@ class TestVisualiseRenderCommand:
         first_server = vis._server
         assert first_server is not None
 
-        with caplog.at_level(
-            "INFO", logger="dkit_visualise.logical_assembly_visualiser"
-        ):
+        with caplog.at_level("INFO", logger="deltakit_visualise.logical_assembly_visualiser"):
             vis.visualise()
 
         assert first_server.should_exit
