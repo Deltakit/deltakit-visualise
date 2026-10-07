@@ -32,7 +32,6 @@ from deltakit_visualise.pipelines.spacetime import SpacetimePipeline
 from deltakit_visualise.pipelines.surfacecodes import PatchVisualisationPipeline
 from deltakit_visualise.visualiser import get_visualisation_data, show
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -245,7 +244,6 @@ class LogicalAssemblyVisualiser:
             port=8000,
             log_level="info",
         )
-
 
         server = uvicorn.Server(config)
         self._server = server
