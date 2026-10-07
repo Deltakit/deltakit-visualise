@@ -343,3 +343,19 @@ class TestVisualiseRenderCommand:
 
         assert vis._server is not None
         assert vis._server.config.app is created_app["app"]
+
+    def test_visualise_restarts_existing_server(self, caplog):
+        """A second notebook execution on the same object stops the old server."""
+        vis = LogicalAssemblyVisualiser.from_log_asm_file(str(QMEM_MLIR_PATH))
+        vis.visualise()
+        first_server = vis._server
+        assert first_server is not None
+
+        with caplog.at_level(
+            "INFO", logger="dkit_visualise.logical_assembly_visualiser"
+        ):
+            vis.visualise()
+
+        assert first_server.should_exit
+        assert vis._server is not first_server
+        assert "Server already running, restarting..." in caplog.text
