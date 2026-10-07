@@ -76,7 +76,8 @@ class TestInsertHeightSimpleChain:
             "declare+prepare+meas_stab+measure",
         ],
     )
-    def test_single_chain_heights(
+    # PLR0913: suppresses "too many arguments" - needed for fixtures + parametrise
+    def test_single_chain_heights(  # noqa: PLR0913
         self,
         make_prepared_patch: MakePreparedPatch,
         make_meas_stab: MakeMeasStab,
