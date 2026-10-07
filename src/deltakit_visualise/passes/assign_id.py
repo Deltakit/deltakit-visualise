@@ -11,11 +11,13 @@ from dataclasses import dataclass
 from functools import singledispatch
 
 from deltakit_compile.dialects.logical_assembly import (
+    GrowOp,
     MeasStabOp,
     MeasureOp,
     MultiPauliMeasOp,
     PatchDeclarationOp,
     PrepareOp,
+    ShrinkOp,
 )
 from xdsl.dialects.builtin import ArrayAttr, ModuleOp, StringAttr
 from xdsl.ir import Operation
@@ -54,6 +56,26 @@ def handle_prepare_id(op: PrepareOp, tracker: IdTracker) -> None:
 @assign_id.register
 def handle_meas_stab_id(op: MeasStabOp, tracker: IdTracker) -> None:
     """Assign input and output ID attributes to a stabiliser measurement operation."""
+    in_id = tracker.next_id()
+    op.attributes[IN_OP_ID] = StringAttr(in_id)
+
+    out_id = tracker.assign(op.res)
+    op.attributes[OUT_OP_ID] = StringAttr(out_id)
+
+
+@assign_id.register
+def handle_grow_id(op: GrowOp, tracker: IdTracker) -> None:
+    """Assign input and output IDs to a patch growth operation."""
+    in_id = tracker.next_id()
+    op.attributes[IN_OP_ID] = StringAttr(in_id)
+
+    out_id = tracker.assign(op.res)
+    op.attributes[OUT_OP_ID] = StringAttr(out_id)
+
+
+@assign_id.register
+def handle_shrink_id(op: ShrinkOp, tracker: IdTracker) -> None:
+    """Assign input and output IDs to a patch shrink operation."""
     in_id = tracker.next_id()
     op.attributes[IN_OP_ID] = StringAttr(in_id)
 

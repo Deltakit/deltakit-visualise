@@ -2,7 +2,13 @@
 """Tests for the InsertHeight pass."""
 
 import pytest
-from deltakit_compile.dialects.logical_assembly import MeasStabOp
+from deltakit_compile.dialects.logical_assembly import (
+    GrowOp,
+    MeasStabOp,
+    OrientationEnum,
+    PlacementAttr,
+    RotatedPlanarPatchType,
+)
 from deltakit_compile.dialects.qstruct import ParallelOp, YieldOp
 from xdsl.dialects.builtin import FloatAttr, ModuleOp
 from xdsl.ir import Block, Operation, Region
@@ -15,6 +21,7 @@ from tests.conftest import (
     MakeMeasure,
     MakeMultiPauliMeas,
     MakePreparedPatch,
+    make_size,
 )
 
 
@@ -469,3 +476,17 @@ class TestInsertHeightParallelOp:
         # Region A starts at 0, Region B also starts at 0 (not at 5).
         assert _get_heights(meas_stab_a) == (0.0, 5.0)
         assert _get_heights(meas_stab_b) == (0.0, 3.0)
+
+
+def test_grow_consumes_rounds_height(make_prepared_patch) -> None:
+    """Test that GrowOp receives height attributes based on its rounds."""
+    patch = make_prepared_patch()
+    destination_type = RotatedPlanarPatchType(
+        make_size(7, 7), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+    )
+    grow = GrowOp(patch.prepare.res, 4, destination_type)
+
+    module = ModuleOp([patch.patch_dec, patch.prepare, grow])
+    InsertHeight().apply(None, module)
+
+    assert _get_heights(grow) == (0.0, 4.0)
