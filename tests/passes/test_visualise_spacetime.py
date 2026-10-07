@@ -618,6 +618,7 @@ class TestHandleStepOperation:
         assert final_surface["location"] == initial_surface["location"]
         assert final_surface["size"] == initial_surface["size"]
 
+
 class TestHandleMeasureOperation:
     """Tests for handle_measure_operation handler."""
 
