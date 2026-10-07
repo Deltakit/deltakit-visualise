@@ -10,13 +10,11 @@ from functools import singledispatch
 from typing import cast
 
 from deltakit_compile.dialects.logical_assembly import (
-    GrowOp,
     MeasStabOp,
     MeasureOp,
     MultiPauliMeasOp,
     PatchDeclarationOp,
     PrepareOp,
-    ShrinkOp,
     SurfaceCodeBasePatch,
 )
 from deltakit_compile.dialects.qstruct import OutputOp, ParallelOp, YieldOp
@@ -75,7 +73,9 @@ def get_end_height(op: Operation) -> float:
 
 
 @singledispatch
-def handle_operation(_op: Operation, _visualisation_data: list[SpaceTimeVisualisationItem]) -> None:
+def handle_operation(
+    _op: Operation, _visualisation_data: list[SpaceTimeVisualisationItem]
+) -> None:
     """
     Generic operation handler using single dispatch.
     This function dispatches to specific handlers based on the type of the operation.
@@ -156,8 +156,7 @@ def handle_measure_stabiliser(
     size = get_patch_size(patch_type)
     orientation = get_patch_orientation(patch_type)
 
-    # NONE surface at the start to show the gap before measurement begins
-    # (sequential height tracking).
+    # NONE surface at the start to show the gap before measurement begins (sequential height tracking).
     # IN_OP_ID is a fresh ID (not chained from previous op) so this surface stands alone.
     start_gap_data: SurfaceData = {
         "type": "surface",
@@ -211,75 +210,6 @@ def handle_measure_operation(
     visualisation_data.append(data)
 
 
-@handle_operation.register(GrowOp)
-@handle_operation.register(ShrinkOp)
-def handle_resize_operation(
-    op: GrowOp | ShrinkOp,
-    visualisation_data: list[SpaceTimeVisualisationItem],
-) -> None:
-    """Handle GrowOp and ShrinkOp for visualisation."""
-    from_patch = cast(SurfaceCodeBasePatch, op.patch.type)
-    to_patch = cast(SurfaceCodeBasePatch, op.res.type)
-
-    source_id = get_attr_str(op, IN_OP_ID)
-    initial_to_patch_id = get_attr_str(op, OUT_OP_ID)
-    final_to_patch_id = f"{initial_to_patch_id}_end"
-
-    start_height = get_start_height(op)
-    end_height = get_end_height(op)
-
-    visualisation_data.extend(
-        [
-            # Add a transparent surface at the start of the resize operation
-            {
-                "type": "surface",
-                "id": source_id,
-                "op_name": op.name,
-                "colour": SurfaceColour.NONE,
-                "location": get_patch_location(from_patch),
-                "size": get_patch_size(from_patch),
-                "startHeight": start_height,
-            },
-            # Add a transparent surface for the initial state of the target patch
-            {
-                "type": "surface",
-                "id": initial_to_patch_id,
-                "op_name": op.name,
-                "colour": SurfaceColour.NONE,
-                "location": get_patch_location(to_patch),
-                "size": get_patch_size(to_patch),
-                "startHeight": start_height,
-            },
-            # Add a resize operation showing patch growing or shrinking to its final size
-            {
-                "type": "resize",
-                "op_name": op.name,
-                "fromSurfaceId": source_id,
-                "toSurfaceId": initial_to_patch_id,
-            },
-            # Add a transparent surface for the final state of the target patch
-            {
-                "type": "surface",
-                "id": final_to_patch_id,
-                "op_name": op.name,
-                "colour": SurfaceColour.NONE,
-                "location": get_patch_location(to_patch),
-                "size": get_patch_size(to_patch),
-                "startHeight": end_height,
-            },
-            # Add sides to visually connect the initial and final states of the target patch
-            {
-                "type": "side",
-                "op_name": op.name,
-                "colourScheme": SideColour.set_colour_scheme(get_patch_orientation(to_patch)),
-                "sides": {"+X": True, "-X": True, "+Y": True, "-Y": True},
-                "fromSurfaceId": initial_to_patch_id,
-                "toSurfaceId": final_to_patch_id,
-            },
-        ]
-    )
-
-
 @handle_operation.register
 def handle_multi_pauli_measurement(
     op: MultiPauliMeasOp, visualisation_data: list[SpaceTimeVisualisationItem]
@@ -288,8 +218,12 @@ def handle_multi_pauli_measurement(
     results: list[SpaceTimeVisualisationItem] = []
     basis = op.basis
 
-    logical_patches = [cast(SurfaceCodeBasePatch, patch.type) for patch in op.logical_patches]
-    bridge_patches = [cast(SurfaceCodeBasePatch, patch.type) for patch in op.bridge_patches]
+    logical_patches = [
+        cast(SurfaceCodeBasePatch, patch.type) for patch in op.logical_patches
+    ]
+    bridge_patches = [
+        cast(SurfaceCodeBasePatch, patch.type) for patch in op.bridge_patches
+    ]
     logical_sides, bridge_sides = get_visible_sides(logical_patches, bridge_patches)
 
     # Process all logical patches
@@ -421,4 +355,6 @@ class VisualiseSpacetime(ModulePass):
         for child in op.walk():
             handle_operation(child, visualisation_data)
         # Store the visualisation_data on the module for later retrieval
-        op.attributes[VISUALISE_SPACETIME_DATA] = StringAttr(json.dumps(visualisation_data))
+        op.attributes[VISUALISE_SPACETIME_DATA] = StringAttr(
+            json.dumps(visualisation_data)
+        )

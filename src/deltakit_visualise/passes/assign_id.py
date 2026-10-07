@@ -11,13 +11,11 @@ from dataclasses import dataclass
 from functools import singledispatch
 
 from deltakit_compile.dialects.logical_assembly import (
-    GrowOp,
     MeasStabOp,
     MeasureOp,
     MultiPauliMeasOp,
     PatchDeclarationOp,
     PrepareOp,
-    ShrinkOp,
 )
 from xdsl.dialects.builtin import ArrayAttr, ModuleOp, StringAttr
 from xdsl.ir import Operation
@@ -64,26 +62,6 @@ def handle_meas_stab_id(op: MeasStabOp, tracker: IdTracker) -> None:
 
 
 @assign_id.register
-def handle_grow_id(op: GrowOp, tracker: IdTracker) -> None:
-    """Assign input and output IDs to a patch growth operation."""
-    in_id = tracker.next_id()
-    op.attributes[IN_OP_ID] = StringAttr(in_id)
-
-    out_id = tracker.assign(op.res)
-    op.attributes[OUT_OP_ID] = StringAttr(out_id)
-
-
-@assign_id.register
-def handle_shrink_id(op: ShrinkOp, tracker: IdTracker) -> None:
-    """Assign input and output IDs to a patch shrink operation."""
-    in_id = tracker.next_id()
-    op.attributes[IN_OP_ID] = StringAttr(in_id)
-
-    out_id = tracker.assign(op.res)
-    op.attributes[OUT_OP_ID] = StringAttr(out_id)
-
-
-@assign_id.register
 def handle_measure_id(op: MeasureOp, tracker: IdTracker) -> None:
     """Assign an output ID attribute to a measure operation."""
     out_id = tracker.assign(op.measurement)
@@ -96,16 +74,24 @@ def handle_multi_pauli_meas_id(op: MultiPauliMeasOp, tracker: IdTracker) -> None
     in_logical_ids = [tracker.next_id() for _ in op.logical_patches]
     out_logical_ids = [tracker.assign(res) for res in op.res]
 
-    op.attributes[IN_LOGICAL_PATCHES_ID] = ArrayAttr([StringAttr(pid) for pid in in_logical_ids])
-    op.attributes[OUT_LOGICAL_PATCHES_ID] = ArrayAttr([StringAttr(pid) for pid in out_logical_ids])
+    op.attributes[IN_LOGICAL_PATCHES_ID] = ArrayAttr(
+        [StringAttr(pid) for pid in in_logical_ids]
+    )
+    op.attributes[OUT_LOGICAL_PATCHES_ID] = ArrayAttr(
+        [StringAttr(pid) for pid in out_logical_ids]
+    )
 
     # for each bridge patch, we need to assign a unique ID given that
     # tracker.get_or_assign(bridge_patch) is returning the same ID for the bridge patch declaration
     in_bridge_ids = [tracker.next_id() for _ in op.bridge_patches]
     out_bridge_ids = [tracker.next_id() for _ in op.bridge_patches]
 
-    op.attributes[IN_BRIDGE_PATCHES_ID] = ArrayAttr([StringAttr(pid) for pid in in_bridge_ids])
-    op.attributes[OUT_BRIDGE_PATCHES_ID] = ArrayAttr([StringAttr(pid) for pid in out_bridge_ids])
+    op.attributes[IN_BRIDGE_PATCHES_ID] = ArrayAttr(
+        [StringAttr(pid) for pid in in_bridge_ids]
+    )
+    op.attributes[OUT_BRIDGE_PATCHES_ID] = ArrayAttr(
+        [StringAttr(pid) for pid in out_bridge_ids]
+    )
 
     tracker.assign(op.measurement)
 

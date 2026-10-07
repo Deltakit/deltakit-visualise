@@ -24,9 +24,9 @@ from deltakit_visualise.utils.server import start_server, static_display
 
 logger = logging.getLogger(__name__)
 
-# The ``type`` discriminators carried by SpaceTimeVisualisationItem.
-# show() uses these to recognise spacetime data.
-_SPACETIME_ITEM_TYPES = frozenset({"surface", "side", "resize"})
+# The ``type`` discriminators carried by SpaceTimeVisualisationItem
+# (SurfaceData / SidesData). show() uses these to recognise spacetime data.
+_SPACETIME_ITEM_TYPES = frozenset({"surface", "side"})
 _PATCH_ITEM_KEYS = frozenset({"round", "qubits", "patches"})
 VisualisationItem = SpaceTimeVisualisationItem | PatchVisualisationItem
 
@@ -55,7 +55,9 @@ def get_visualisation_data(
         PATCH_VISUALISATION_DATA
     )
     visualisation_type = (
-        f"{SPACE_TIME}" if module.attributes.get(VISUALISE_SPACETIME_DATA) else f"{LOGICAL_PATCH}"
+        f"{SPACE_TIME}"
+        if module.attributes.get(VISUALISE_SPACETIME_DATA)
+        else f"{LOGICAL_PATCH}"
     )
     if attr is None:
         msg = (
@@ -73,8 +75,7 @@ def show(data: dict[str, list[VisualisationItem]], static: bool = True) -> Path:
 
     Pass the ``{"ops": [...]}`` payload from :func:`get_visualisation_data`.
     The view is determined from the item schema:
-    ``SpaceTimeVisualisationItem`` (``type`` of ``"surface"``, ``"side"``, or
-    ``"resize"``)
+    ``SpaceTimeVisualisationItem`` (``type`` of ``"surface"``/``"side"``)
     renders the 3D spacetime view, while ``PatchVisualisationItem``
     (``round``/``qubits``/``patches`` fields) renders the 2D patch view.
 
