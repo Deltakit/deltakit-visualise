@@ -232,8 +232,7 @@ def handle_measure_stabiliser(
     size = get_patch_size(patch_type)
     colour_scheme = SideColour.set_colour_scheme(get_patch_orientation(patch_type))
 
-    # NONE surface at the start to show the gap before measurement begins
-    # (sequential height tracking).
+    # NONE surface at the start to show the gap before measurement begins (sequential height tracking).
     # IN_OP_ID is a fresh ID (not chained from previous op) so this surface stands alone.
     start_gap_data: SurfaceData = {
         "type": "surface",
@@ -287,25 +286,20 @@ def handle_measure_operation(
     visualisation_data.append(data)
 
 
-@handle_operation.register(GrowOp)
-@handle_operation.register(ShrinkOp)
-def handle_resize_operation(
-    op: GrowOp | ShrinkOp,
-    visualisation_data: list[SpaceTimeVisualisationItem],
-) -> None:
-    """Handle GrowOp and ShrinkOp for visualisation."""
+@handle_operation.register
+def handle_grow_operation(op: GrowOp, visualisation_data: list[SpaceTimeVisualisationItem]) -> None:
+    """Handle GrowOp for visualisation."""
     from_patch = cast(SurfaceCodeBasePatch, op.patch.type)
     to_patch = cast(SurfaceCodeBasePatch, op.res.type)
-
     source_id = get_attr_str(op, IN_OP_ID)
     initial_to_patch_id = get_attr_str(op, OUT_OP_ID)
     final_to_patch_id = f"{initial_to_patch_id}_end"
-
     start_height = get_start_height(op)
     end_height = get_end_height(op)
 
     visualisation_data.extend(
         [
+            # Create a transparent surface with the smaller size
             {
                 "type": "surface",
                 "id": source_id,
@@ -315,6 +309,7 @@ def handle_resize_operation(
                 "size": get_patch_size(from_patch),
                 "startHeight": start_height,
             },
+            # Create a transparent surface with the bigger size
             {
                 "type": "surface",
                 "id": initial_to_patch_id,
@@ -324,12 +319,14 @@ def handle_resize_operation(
                 "size": get_patch_size(to_patch),
                 "startHeight": start_height,
             },
+            # Create a resize operation connecting the smaller and bigger surfaces
             {
                 "type": "resize",
                 "op_name": op.name,
                 "fromSurfaceId": source_id,
                 "toSurfaceId": initial_to_patch_id,
             },
+            # Create a transparent surface at the end height of the grown surface
             {
                 "type": "surface",
                 "id": final_to_patch_id,
@@ -339,6 +336,7 @@ def handle_resize_operation(
                 "size": get_patch_size(to_patch),
                 "startHeight": end_height,
             },
+            # Create the sides connecting the initial and final surfaces of the grown patch
             {
                 "type": "side",
                 "op_name": op.name,
