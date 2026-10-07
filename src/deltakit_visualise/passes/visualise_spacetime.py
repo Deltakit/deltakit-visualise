@@ -232,7 +232,8 @@ def handle_measure_stabiliser(
     size = get_patch_size(patch_type)
     colour_scheme = SideColour.set_colour_scheme(get_patch_orientation(patch_type))
 
-    # NONE surface at the start to show the gap before measurement begins (sequential height tracking).
+    # NONE surface at the start to show the gap before measurement begins
+    # (sequential height tracking).
     # IN_OP_ID is a fresh ID (not chained from previous op) so this surface stands alone.
     start_gap_data: SurfaceData = {
         "type": "surface",
@@ -681,7 +682,7 @@ def handle_rotate_operation(
         "size": to_size,
         "startHeight": get_end_height(op),
     }
-    # Add rotate operation for the target patch with colour scheme based on orientation and rotation direction
+    # Add rotate operation for the target patch using its orientation and rotation direction.
     rotate_to: RotateData = {
         "type": "rotate",
         "op_name": op.name,
