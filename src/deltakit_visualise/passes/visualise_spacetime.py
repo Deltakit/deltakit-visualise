@@ -10,7 +10,6 @@ from functools import singledispatch
 from typing import cast
 
 from deltakit_compile.dialects.logical_assembly import (
-    GrowOp,
     MeasStabOp,
     MeasureOp,
     MultiPauliMeasOp,
@@ -148,7 +147,9 @@ def get_rotate_surface_colours(
 
 
 @singledispatch
-def handle_operation(_op: Operation, _visualisation_data: list[SpaceTimeVisualisationItem]) -> None:
+def handle_operation(
+    _op: Operation, _visualisation_data: list[SpaceTimeVisualisationItem]
+) -> None:
     """
     Generic operation handler using single dispatch.
     This function dispatches to specific handlers based on the type of the operation.
@@ -232,8 +233,7 @@ def handle_measure_stabiliser(
     size = get_patch_size(patch_type)
     colour_scheme = SideColour.set_colour_scheme(get_patch_orientation(patch_type))
 
-    # NONE surface at the start to show the gap before measurement begins
-    # (sequential height tracking).
+    # NONE surface at the start to show the gap before measurement begins (sequential height tracking).
     # IN_OP_ID is a fresh ID (not chained from previous op) so this surface stands alone.
     start_gap_data: SurfaceData = {
         "type": "surface",
@@ -723,8 +723,12 @@ def handle_multi_pauli_measurement(
     results: list[SpaceTimeVisualisationItem] = []
     basis = op.basis
 
-    logical_patches = [cast(SurfaceCodeBasePatch, patch.type) for patch in op.logical_patches]
-    bridge_patches = [cast(SurfaceCodeBasePatch, patch.type) for patch in op.bridge_patches]
+    logical_patches = [
+        cast(SurfaceCodeBasePatch, patch.type) for patch in op.logical_patches
+    ]
+    bridge_patches = [
+        cast(SurfaceCodeBasePatch, patch.type) for patch in op.bridge_patches
+    ]
     logical_sides, bridge_sides = get_visible_sides(logical_patches, bridge_patches)
 
     # Process all logical patches
@@ -856,4 +860,6 @@ class VisualiseSpacetime(ModulePass):
         for child in op.walk():
             handle_operation(child, visualisation_data)
         # Store the visualisation_data on the module for later retrieval
-        op.attributes[VISUALISE_SPACETIME_DATA] = StringAttr(json.dumps(visualisation_data))
+        op.attributes[VISUALISE_SPACETIME_DATA] = StringAttr(
+            json.dumps(visualisation_data)
+        )
