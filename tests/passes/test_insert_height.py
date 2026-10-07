@@ -8,6 +8,7 @@ from deltakit_compile.dialects.logical_assembly import (
     OrientationEnum,
     PlacementAttr,
     RotatedPlanarPatchType,
+    RotateOp,
     StepOp,
 )
 from deltakit_compile.dialects.qstruct import ParallelOp, YieldOp
@@ -75,7 +76,8 @@ class TestInsertHeightSimpleChain:
             "declare+prepare+meas_stab+measure",
         ],
     )
-    def test_single_chain_heights(
+    # PLR0913: suppresses "too many arguments" - needed for fixtures + parametrise
+    def test_single_chain_heights(  # noqa: PLR0913
         self,
         make_prepared_patch: MakePreparedPatch,
         make_meas_stab: MakeMeasStab,
@@ -128,6 +130,21 @@ class TestInsertHeightSimpleChain:
 
         assert _get_heights(first_step) == (0.0, 1.0)
         assert _get_heights(second_step) == (1.0, 2.0)
+
+    def test_rotate_op_advances_height_by_rounds(self) -> None:
+        """RotateOp spans its configured number of rounds."""
+        start_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        end_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([3, 0], OrientationEnum.HORIZONTAL_Z)
+        )
+        patch = test.TestOp(result_types=[start_type]).res[0]
+        rotate = RotateOp(patch, 6, end_type)
+
+        InsertHeight().apply(None, ModuleOp([rotate]))
+
+        assert _get_heights(rotate) == (0.0, 6.0)
 
 
 class TestInsertHeightMultiPauli:
