@@ -119,8 +119,17 @@ class SidesData(TypedDict):
     toSurfaceId: str
 
 
+class ResizeData(TypedDict):
+    """Resize visualisation data item."""
+
+    type: Literal["resize"]
+    op_name: str
+    fromSurfaceId: str
+    toSurfaceId: str
+
+
 # Union type for the 3D spacetime visualisation items
-SpaceTimeVisualisationItem = SurfaceData | SidesData
+SpaceTimeVisualisationItem = SurfaceData | SidesData | ResizeData
 
 
 class PlaquetteData(TypedDict):
