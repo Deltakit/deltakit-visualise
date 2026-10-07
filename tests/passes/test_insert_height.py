@@ -8,8 +8,10 @@ from deltakit_compile.dialects.logical_assembly import (
     OrientationEnum,
     PlacementAttr,
     RotatedPlanarPatchType,
+    StepOp,
 )
 from deltakit_compile.dialects.qstruct import ParallelOp, YieldOp
+from xdsl.dialects import test
 from xdsl.dialects.builtin import FloatAttr, ModuleOp
 from xdsl.ir import Block, Operation, Region
 
@@ -73,7 +75,6 @@ class TestInsertHeightSimpleChain:
             "declare+prepare+meas_stab+measure",
         ],
     )
-    # PLR0913: suppresses "too many arguments" - needed for fixtures + parametrise
     def test_single_chain_heights(
         self,
         make_prepared_patch: MakePreparedPatch,
@@ -107,6 +108,26 @@ class TestInsertHeightSimpleChain:
 
         for op_name, expected in expected_heights.items():
             assert _get_heights(op_map[op_name]) == expected, f"Height mismatch for {op_name}"
+
+    def test_step_ops_advance_height_by_one(self) -> None:
+        """Each StepOp starts one height unit after the previous step."""
+        patch_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        next_patch_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([1, 0], OrientationEnum.VERTICAL_Z)
+        )
+        final_patch_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([2, 0], OrientationEnum.VERTICAL_Z)
+        )
+        patch = test.TestOp(result_types=[patch_type]).res[0]
+        first_step = StepOp(patch, next_patch_type)
+        second_step = StepOp(first_step.res, final_patch_type)
+
+        InsertHeight().apply(None, ModuleOp([first_step, second_step]))
+
+        assert _get_heights(first_step) == (0.0, 1.0)
+        assert _get_heights(second_step) == (1.0, 2.0)
 
 
 class TestInsertHeightMultiPauli:
