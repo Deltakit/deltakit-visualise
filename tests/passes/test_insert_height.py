@@ -75,8 +75,7 @@ class TestInsertHeightSimpleChain:
             "declare+prepare+meas_stab+measure",
         ],
     )
-    # PLR0913: suppresses "too many arguments" - needed for fixtures + parametrise
-    def test_single_chain_heights(  # noqa: PLR0913
+    def test_single_chain_heights(
         self,
         make_prepared_patch: MakePreparedPatch,
         make_meas_stab: MakeMeasStab,
@@ -310,7 +309,8 @@ class TestInsertHeightConsecutiveMeasStab:
         meas_stab_a2 = make_meas_stab(meas_stab_a1.res, 3)
 
         # Patch B operations: declare -> prepare -> meas_stab(2) -> meas_stab(4) -> meas_stab(6)
-        # Sequential: declare_b (8,8), prepare_b (8,8), meas_stab_b1 (8,10), meas_stab_b2 (10,14), meas_stab_b3 (14,20)
+        # Sequential: declare_b (8,8), prepare_b (8,8), meas_stab_b1 (8,10),
+        # meas_stab_b2 (10,14), meas_stab_b3 (14,20)
         meas_stab_b1 = make_meas_stab(patch_b.prepare.res, 2)
         meas_stab_b2 = make_meas_stab(meas_stab_b1.res, 4)
         meas_stab_b3 = make_meas_stab(meas_stab_b2.res, 6)
