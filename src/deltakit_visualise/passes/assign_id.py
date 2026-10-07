@@ -17,7 +17,9 @@ from deltakit_compile.dialects.logical_assembly import (
     MultiPauliMeasOp,
     PatchDeclarationOp,
     PrepareOp,
+    RotateOp,
     ShrinkOp,
+    StepOp,
 )
 from xdsl.dialects.builtin import ArrayAttr, ModuleOp, StringAttr
 from xdsl.ir import Operation
@@ -108,6 +110,26 @@ def handle_multi_pauli_meas_id(op: MultiPauliMeasOp, tracker: IdTracker) -> None
     op.attributes[OUT_BRIDGE_PATCHES_ID] = ArrayAttr([StringAttr(pid) for pid in out_bridge_ids])
 
     tracker.assign(op.measurement)
+
+
+@assign_id.register
+def handle_step_id(op: StepOp, tracker: IdTracker) -> None:
+    """Assign input and output ID attributes to a step operation."""
+    in_id = tracker.next_id()
+    op.attributes[IN_OP_ID] = StringAttr(in_id)
+
+    out_id = tracker.assign(op.res)
+    op.attributes[OUT_OP_ID] = StringAttr(out_id)
+
+
+@assign_id.register
+def handle_rotate_id(op: RotateOp, tracker: IdTracker) -> None:
+    """Assign input and output ID attributes to a rotate operation."""
+    in_id = tracker.next_id()
+    op.attributes[IN_OP_ID] = StringAttr(in_id)
+
+    out_id = tracker.assign(op.res)
+    op.attributes[OUT_OP_ID] = StringAttr(out_id)
 
 
 @assign_id.register

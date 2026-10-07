@@ -62,6 +62,71 @@ class SideColour(BetterStrEnum):
         msg = f"Unsupported orientation: {orientation}"
         raise ValueError(msg)
 
+    @staticmethod
+    def set_colour_scheme_from_basis(
+        basis: PauliAttr,
+    ) -> tuple["SideColour", "SideColour"]:
+        """Determine side colours from a preparation basis."""
+        if basis.data.name == "X":
+            return (SideColour.BLUE, SideColour.RED)
+        if basis.data.name == "Z":
+            return (SideColour.RED, SideColour.BLUE)
+        msg = f"Unsupported Pauli basis: {basis}"
+        raise ValueError(msg)
+
+
+RotateIndexPattern = tuple[int, int, int, int]
+
+_ROTATE_PATTERNS: dict[str, RotateIndexPattern] = {
+    "+x": (1, 0, 0, 1),
+    "-x": (0, 1, 0, 1),
+    "+y": (0, 1, 0, 1),
+    "-y": (1, 0, 1, 0),
+}
+_ROTATED_PATTERNS: dict[str, RotateIndexPattern] = {
+    "+x": (0, 1, 0, 1),
+    "-x": (1, 0, 0, 1),
+    "+y": (0, 1, 1, 0),
+    "-y": (1, 0, 0, 1),
+}
+
+
+class RotateColour(BetterStrEnum):
+    """Rotate colour options."""
+
+    RED = "RED"
+    BLUE = "BLUE"
+
+    @staticmethod
+    def _from_pattern(
+        orientation: OrientationAttr,
+        rotation_direction: str,
+        patterns: dict[str, RotateIndexPattern],
+    ) -> tuple["RotateColour", "RotateColour", "RotateColour", "RotateColour"]:
+        pattern = patterns.get(rotation_direction)
+        if pattern is None:
+            msg = f"Unsupported rotation direction: {rotation_direction}"
+            raise ValueError(msg)
+        pair = [RotateColour(c.value) for c in SideColour.set_colour_scheme(orientation)]
+        i1, i2, i3, i4 = pattern
+        return (pair[i1], pair[i2], pair[i3], pair[i4])
+
+    @staticmethod
+    def set_colour_scheme(
+        orientation: OrientationAttr,
+        rotation_direction: str,
+    ) -> tuple["RotateColour", "RotateColour", "RotateColour", "RotateColour"]:
+        """Determine rotate colours for the patch before rotation."""
+        return RotateColour._from_pattern(orientation, rotation_direction, _ROTATE_PATTERNS)
+
+    @staticmethod
+    def set_rotated_colour_scheme(
+        orientation: OrientationAttr,
+        rotation_direction: str,
+    ) -> tuple["RotateColour", "RotateColour", "RotateColour", "RotateColour"]:
+        """Determine rotate colours for the patch after rotation."""
+        return RotateColour._from_pattern(orientation, rotation_direction, _ROTATED_PATTERNS)
+
 
 class SurfaceData(TypedDict):
     """Surface visualisation data item.
@@ -128,8 +193,30 @@ class ResizeData(TypedDict):
     toSurfaceId: str
 
 
+class StepData(TypedDict):
+    """Step visualisation data item."""
+
+    type: Literal["step"]
+    op_name: str
+    colourScheme: tuple[SideColour, SideColour]
+    sides: SideVisibility
+    fromSurfaceId: str
+    toSurfaceId: str
+
+
+class RotateData(TypedDict):
+    """Rotate visualisation data item."""
+
+    type: Literal["rotate"]
+    op_name: str
+    colourScheme: tuple[RotateColour, RotateColour, RotateColour, RotateColour]
+    sides: SideVisibility
+    fromSurfaceId: str
+    toSurfaceId: str
+
+
 # Union type for the 3D spacetime visualisation items
-SpaceTimeVisualisationItem = SurfaceData | SidesData | ResizeData
+SpaceTimeVisualisationItem = SurfaceData | SidesData | ResizeData | StepData | RotateData
 
 
 class PlaquetteData(TypedDict):

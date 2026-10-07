@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # The ``type`` discriminators carried by SpaceTimeVisualisationItem.
 # show() uses these to recognise spacetime data.
-_SPACETIME_ITEM_TYPES = frozenset({"surface", "side", "resize"})
+_SPACETIME_ITEM_TYPES = frozenset({"surface", "side", "step", "resize", "rotate"})
 _PATCH_ITEM_KEYS = frozenset({"round", "qubits", "patches"})
 VisualisationItem = SpaceTimeVisualisationItem | PatchVisualisationItem
 
@@ -73,9 +73,9 @@ def show(data: dict[str, list[VisualisationItem]], static: bool = True) -> Path:
 
     Pass the ``{"ops": [...]}`` payload from :func:`get_visualisation_data`.
     The view is determined from the item schema:
-    ``SpaceTimeVisualisationItem`` (``type`` of ``"surface"``, ``"side"``, or
-    ``"resize"``)
-    renders the 3D spacetime view, while ``PatchVisualisationItem``
+    ``SpaceTimeVisualisationItem`` (``type`` of ``"surface"``, ``"side"``, ``"step"``,
+    ``"resize"``, or ``"rotate"``) renders the 3D spacetime view, while
+    ``PatchVisualisationItem``
     (``round``/``qubits``/``patches`` fields) renders the 2D patch view.
 
     Args:

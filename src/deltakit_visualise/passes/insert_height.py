@@ -18,7 +18,9 @@ from deltakit_compile.dialects.logical_assembly import (
     MultiPauliMeasOp,
     PatchDeclarationOp,
     PrepareOp,
+    RotateOp,
     ShrinkOp,
+    StepOp,
 )
 from deltakit_compile.dialects.qstruct import ParallelOp
 from xdsl.dialects.builtin import Float64Type, FloatAttr, ModuleOp
@@ -134,6 +136,22 @@ def handle_measure_height(op: MeasureOp, tracker: HeightTracker) -> None:
 @insert_height.register
 def handle_multi_pauli_meas_height(op: MultiPauliMeasOp, tracker: HeightTracker) -> None:
     """MultiPauliMeasOp occupies *rounds* height units."""
+    start, end = tracker.consume(op.rounds.data)
+    op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
+    op.attributes[END_HEIGHT_ATTR] = FloatAttr(end, Float64Type())
+
+
+@insert_height.register
+def handle_step_height(op: StepOp, tracker: HeightTracker) -> None:
+    """StepOp advances the visualisation by one height unit."""
+    start, end = tracker.consume(1.0)
+    op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
+    op.attributes[END_HEIGHT_ATTR] = FloatAttr(end, Float64Type())
+
+
+@insert_height.register
+def handle_rotate_height(op: RotateOp, tracker: HeightTracker) -> None:
+    """RotateOp occupies *rounds* height units."""
     start, end = tracker.consume(op.rounds.data)
     op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
     op.attributes[END_HEIGHT_ATTR] = FloatAttr(end, Float64Type())
