@@ -2,6 +2,7 @@
 """Visualisation interface for Logical-Assembly programs."""
 
 import asyncio
+import logging
 import threading
 from pathlib import Path
 from threading import Thread
@@ -30,6 +31,8 @@ from deltakit_visualise.pipelines.base import VisualisationConfiguration
 from deltakit_visualise.pipelines.spacetime import SpacetimePipeline
 from deltakit_visualise.pipelines.surfacecodes import PatchVisualisationPipeline
 from deltakit_visualise.visualiser import get_visualisation_data, show
+
+logger = logging.getLogger(__name__)
 
 
 class LogicalAssemblyVisualiser:
@@ -167,6 +170,44 @@ class LogicalAssemblyVisualiser:
         context.load_dialect(Plaquette)
         return context
 
+    def _restart_active_server_if_any(self) -> None:
+        """Stop a previously active visualisation server for this object."""
+        active_server = self._server
+        if active_server is None:
+            return
+
+        logger.info("Server already running, restarting...")
+        active_server.should_exit = True
+
+        active_thread = self._thread
+        if active_thread is not None:
+            active_thread.join()
+
+        self._server = None
+        self._thread = None
+
+    def _run_server_with_tracking(self, server: Server) -> None:
+        """Run ``server`` while keeping this instance's active state in sync."""
+        self._server = server
+        try:
+            server.run()
+        finally:
+            pass
+
+    def _start_server(self, server: Server) -> None:
+        """Start ``server`` blocking outside notebooks, else on a background thread."""
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            self._run_server_with_tracking(server)
+        else:
+            self._thread = threading.Thread(
+                target=self._run_server_with_tracking,
+                args=(server,),
+                daemon=True,
+            )
+            self._thread.start()
+
     def visualise(self) -> None:
         """Visualise the program in the browser.
 
@@ -195,6 +236,8 @@ class LogicalAssemblyVisualiser:
             render_command=RENDER_VISUALISE_COMMAND,
         )
 
+        self._restart_active_server_if_any()
+
         config = uvicorn.Config(
             app,
             host="127.0.0.1",
@@ -202,7 +245,9 @@ class LogicalAssemblyVisualiser:
             log_level="info",
         )
 
-        self._server = uvicorn.Server(config)
+        server = uvicorn.Server(config)
+        self._server = server
+        self._start_server(server)
 
         try:
             asyncio.get_running_loop()
@@ -217,8 +262,12 @@ class LogicalAssemblyVisualiser:
 
     def stop(self) -> None:
         """Stop the visualisation server."""
-        if self._server is not None:
-            self._server.should_exit = True
+        server = self._server
+        if server is not None:
+            server.should_exit = True
 
         if self._thread is not None:
-            self._thread.join(timeout=5)
+            self._thread.join()
+
+        self._server = None
+        self._thread = None
