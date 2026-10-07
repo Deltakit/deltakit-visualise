@@ -41,7 +41,6 @@ from deltakit_visualise.passes.visualise_spacetime import (
     handle_patch_declaration,
     handle_prepare_operation,
     handle_rotate_operation,
-    handle_resize_operation,
     handle_shrink_operation,
     handle_step_operation,
 )
