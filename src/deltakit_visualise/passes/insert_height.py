@@ -1,6 +1,7 @@
 # (c) Copyright Riverlane 2025-2026. All rights reserved.
 """
-Compiler pass that walks the AST to insert START_HEIGHT_ATTR and END_HEIGHT_ATTR attributes into Ops.
+Compiler pass that walks the AST to insert START_HEIGHT_ATTR and END_HEIGHT_ATTR
+attributes into Ops.
 
 Height tracking uses an increasing counter. Each operation is placed immediately
 after the previous one. ParallelOp children are synchronised so that all regions
