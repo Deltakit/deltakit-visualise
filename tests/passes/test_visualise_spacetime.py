@@ -50,6 +50,11 @@ from deltakit_visualise.types import (
     SpaceTimeVisualisationItem,
     SurfaceColour,
 )
+from deltakit_visualise.utils.attributes import (
+    get_patch_location,
+    get_patch_orientation,
+    get_patch_size,
+)
 from tests.conftest import make_size
 
 
@@ -81,7 +86,8 @@ class TestHeightAttributes:
             get_end_height(op)
 
     def test_handle_patch_declaration_missing_start_height_raises_error(self):
-        """Test that handle_patch_declaration raises ValueError when START_HEIGHT_ATTR is missing."""
+        """Test that handle_patch_declaration raises ValueError when START_HEIGHT_ATTR
+        is missing."""
         patch_type = RotatedPlanarPatchType(
             make_size(5, 5), PlacementAttr([1, 1], OrientationEnum.VERTICAL_Z)
         )
@@ -385,7 +391,8 @@ class TestHandleMultiPauliMeasurement:
 
         handle_multi_pauli_measurement(op, visualisation_data)
 
-        # Output: 2 logical (start surface + sides + end surface each) + 1 bridge (surface + sides + surface) = 9
+        # Output: 2 logical (start surface + sides + end surface each) +
+        # 1 bridge (surface + sides + surface) = 9
         assert len(visualisation_data) == 9
 
         # Check sides data
@@ -723,6 +730,49 @@ class TestHandleRotateOperation:
             RotateColour.RED,
             RotateColour.BLUE,
         )
+
+    def test_four_rotations_restore_initial_patch_geometry(self) -> None:
+        """Four axis-aligned rotations return a 4x4 patch to its initial geometry."""
+        initial_type = RotatedPlanarPatchType(
+            make_size(4, 4), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        offsets = [(0, 4), (8, 0), (0, -4), (-8, 0)]
+        end_orientations = [
+            OrientationEnum.HORIZONTAL_Z,
+            OrientationEnum.VERTICAL_Z,
+            OrientationEnum.HORIZONTAL_Z,
+            OrientationEnum.VERTICAL_Z,
+        ]
+        patch = test.TestOp(result_types=[initial_type]).res[0]
+        current_location = (0.0, 0.0)
+        rotate_operations = []
+
+        for index, ((offset_x, offset_y), orientation) in enumerate(
+            zip(offsets, end_orientations, strict=True), start=1
+        ):
+            current_location = (
+                current_location[0] + offset_x,
+                current_location[1] + offset_y,
+            )
+            destination_type = RotatedPlanarPatchType(
+                make_size(4, 4), PlacementAttr(current_location, orientation)
+            )
+            rotate_op = RotateOp(patch, 4, destination_type)
+            rotate_op.attributes[START_HEIGHT_ATTR] = IntAttr((index - 1) * 4)
+            rotate_op.attributes[END_HEIGHT_ATTR] = IntAttr(index * 4)
+            rotate_op.attributes[IN_OP_ID] = StringAttr(f"patch_{index - 1}")
+            rotate_op.attributes[OUT_OP_ID] = StringAttr(f"patch_{index}")
+            rotate_operations.append(rotate_op)
+            patch = rotate_op.res
+
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+        for rotate_op in rotate_operations:
+            handle_rotate_operation(rotate_op, visualisation_data)
+
+        final_type = patch.type
+        assert get_patch_location(final_type) == get_patch_location(initial_type)
+        assert get_patch_size(final_type) == get_patch_size(initial_type)
+        assert get_patch_orientation(final_type) == get_patch_orientation(initial_type)
 
 
 class TestHandleMeasureOperation:
