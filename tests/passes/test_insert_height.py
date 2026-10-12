@@ -11,7 +11,6 @@ from deltakit_compile.dialects.logical_assembly import (
     RotateOp,
     StepOp,
 )
-from deltakit_compile.dialects.logical_assembly import MeasStabOp
 from deltakit_compile.dialects.qstruct import ParallelOp, YieldOp
 from xdsl.dialects import test
 from xdsl.dialects.builtin import FloatAttr, ModuleOp
