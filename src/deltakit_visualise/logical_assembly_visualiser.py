@@ -249,17 +249,6 @@ class LogicalAssemblyVisualiser:
         self._server = server
         self._start_server(server)
 
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            self._server.run()
-        else:
-            self._thread = threading.Thread(
-                target=self._server.run,
-                daemon=True,
-            )
-            self._thread.start()
-
     def stop(self) -> None:
         """Stop the visualisation server."""
         server = self._server

@@ -277,6 +277,27 @@ def _created_app(monkeypatch):
 class TestVisualiseRenderCommand:
     """``visualise`` must serve the frontend with the surface-code panel enabled."""
 
+    def test_visualise_runs_server_once(self, monkeypatch):
+        """Server startup is delegated once rather than repeated in visualise."""
+        runs = []
+
+        def no_running_loop():
+            raise RuntimeError
+
+        def record_run(server):
+            runs.append(server)
+
+        monkeypatch.setattr(
+            "deltakit_visualise.logical_assembly_visualiser.asyncio.get_running_loop",
+            no_running_loop,
+        )
+        monkeypatch.setattr(uvicorn.Server, "run", record_run)
+        vis = LogicalAssemblyVisualiser.from_log_asm_file(str(QMEM_MLIR_PATH))
+
+        vis.visualise()
+
+        assert runs == [vis._server]
+
     def test_visualise_passes_visualise_render_command(self, created_app):
         """create_app is given RENDER_VISUALISE_COMMAND, not the default."""
         vis = LogicalAssemblyVisualiser.from_log_asm_file(str(QMEM_MLIR_PATH))
