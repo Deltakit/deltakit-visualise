@@ -15,6 +15,7 @@ from deltakit_compile.dialects.logical_assembly import (
     GrowOp,
     MeasStabOp,
     MeasureOp,
+    MoveOp,
     MultiPauliMeasOp,
     PatchDeclarationOp,
     PrepareOp,
@@ -152,6 +153,14 @@ def handle_step_height(op: StepOp, tracker: HeightTracker) -> None:
 @insert_height.register
 def handle_rotate_height(op: RotateOp, tracker: HeightTracker) -> None:
     """RotateOp occupies *rounds* height units."""
+    start, end = tracker.consume(op.rounds.data)
+    op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
+    op.attributes[END_HEIGHT_ATTR] = FloatAttr(end, Float64Type())
+
+
+@insert_height.register
+def handle_move_height(op: MoveOp, tracker: HeightTracker) -> None:
+    """MoveOp occupies *rounds* height units."""
     start, end = tracker.consume(op.rounds.data)
     op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
     op.attributes[END_HEIGHT_ATTR] = FloatAttr(end, Float64Type())
