@@ -128,8 +128,19 @@ class ResizeData(TypedDict):
     toSurfaceId: str
 
 
+class StepData(TypedDict):
+    """Step visualisation data item."""
+
+    type: Literal["step"]
+    op_name: str
+    colourScheme: tuple[SideColour, SideColour]
+    sides: SideVisibility
+    fromSurfaceId: str
+    toSurfaceId: str
+
+
 # Union type for the 3D spacetime visualisation items
-SpaceTimeVisualisationItem = SurfaceData | SidesData | ResizeData
+SpaceTimeVisualisationItem = SurfaceData | SidesData | ResizeData | StepData
 
 
 class PlaquetteData(TypedDict):
