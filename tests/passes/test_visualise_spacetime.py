@@ -611,6 +611,83 @@ class TestHandleStepOperation:
 class TestHandleRotateOperation:
     """Tests for handle_rotate_operation handler."""
 
+    @pytest.mark.parametrize("bridge_count", [1, 3])
+    def test_bridge_upper_half_uses_rotate_connector(self, bridge_count: int) -> None:
+        """The bridge rotates above its midpoint instead of using straight sides."""
+        start_type = RotatedPlanarPatchType(
+            make_size(4, 4), PlacementAttr([0, 0], OrientationEnum.HORIZONTAL_Z)
+        )
+        bridge_height = 4 if bridge_count == 1 else 2
+        bridge_locations = [(0, 4 + index * bridge_height) for index in range(bridge_count)]
+        bridges = [
+            test.TestOp(
+                result_types=[
+                    RotatedPlanarPatchType(
+                        make_size(4, bridge_height),
+                        PlacementAttr(location, OrientationEnum.VERTICAL_Z),
+                    )
+                ]
+            ).res[0]
+            for location in bridge_locations
+        ]
+        end_type = RotatedPlanarPatchType(
+            make_size(4, 4),
+            PlacementAttr([0, 4 + bridge_count * bridge_height], OrientationEnum.VERTICAL_Z),
+        )
+        patch = test.TestOp(result_types=[start_type]).res[0]
+        op = RotateOp(patch, 8, end_type, bridges=bridges)
+        op.attributes[START_HEIGHT_ATTR] = IntAttr(4)
+        op.attributes[END_HEIGHT_ATTR] = IntAttr(12)
+        op.attributes[IN_OP_ID] = StringAttr("rotate_in")
+        op.attributes[OUT_OP_ID] = StringAttr("rotate_out")
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+
+        handle_rotate_operation(op, visualisation_data)
+
+        surfaces = [item for item in visualisation_data if item["type"] == "surface"]
+        assert len({item["id"] for item in surfaces}) == len(surfaces)
+        surfaces_by_id = {item["id"]: item for item in surfaces}
+        for location in bridge_locations:
+            location_ids = {item["id"] for item in surfaces if item["location"] == location}
+            connectors = [
+                item
+                for item in visualisation_data
+                if item["type"] in ("side", "rotate") and item["fromSurfaceId"] in location_ids
+            ]
+            assert [item["type"] for item in connectors] == ["side", "rotate"]
+            for connector in connectors:
+                assert surfaces_by_id[connector["fromSurfaceId"]]["location"] == location
+                assert surfaces_by_id[connector["toSurfaceId"]]["location"] == location
+        bridge_surfaces = [
+            item
+            for item in visualisation_data
+            if item["type"] == "surface" and item["location"] == (0, 4)
+        ]
+        assert [item["startHeight"] for item in bridge_surfaces] == [4, 8, 12]
+        bridge_ids = [item["id"] for item in bridge_surfaces]
+        bridge_connectors = [
+            item
+            for item in visualisation_data
+            if item["type"] in ("side", "rotate") and item["fromSurfaceId"] in bridge_ids
+        ]
+        assert [item["type"] for item in bridge_connectors] == ["side", "rotate"]
+        assert [(item["fromSurfaceId"], item["toSurfaceId"]) for item in bridge_connectors] == [
+            (bridge_ids[0], bridge_ids[1]),
+            (bridge_ids[1], bridge_ids[2]),
+        ]
+        assert bridge_connectors[1]["colourScheme"] == (
+            RotateColour.BLUE,
+            RotateColour.RED,
+            RotateColour.BLUE,
+            RotateColour.RED,
+        )
+        assert bridge_connectors[1]["sides"] == {
+            "+X": True,
+            "-X": True,
+            "+Y": False,
+            "-Y": False,
+        }
+
     def test_outputs_rotation_surfaces_and_connectors(self) -> None:
         """Test that RotateOp outputs the requested reused-surface rotation shape."""
         start_type = RotatedPlanarPatchType(
