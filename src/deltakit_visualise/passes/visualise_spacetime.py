@@ -13,6 +13,7 @@ from deltakit_compile.dialects.logical_assembly import (
     GrowOp,
     MeasStabOp,
     MeasureOp,
+    MoveOp,
     MultiPauliMeasOp,
     OrientationAttr,
     OrientationEnum,
@@ -32,6 +33,7 @@ from xdsl.passes import ModulePass
 from deltakit_visualise.constants import (
     END_HEIGHT_ATTR,
     IN_OP_ID,
+    MOVE_BRIDGE_PATCHES_ID,
     OUT_OP_ID,
     START_HEIGHT_ATTR,
     VISUALISE_SPACETIME_DATA,
@@ -56,6 +58,7 @@ from deltakit_visualise.utils.attributes import (
     get_patch_location,
     get_patch_orientation,
     get_patch_size,
+    get_string_list_attr,
 )
 from deltakit_visualise.utils.patch_geometry import VisibleSides, get_visible_sides
 
@@ -525,6 +528,159 @@ def handle_step_operation(op: StepOp, visualisation_data: list[SpaceTimeVisualis
     visualisation_data.append(start_gap_data)
     visualisation_data.append(surface_data)
     visualisation_data.append(end_gap_data)
+
+
+@handle_operation.register
+def handle_move_operation(
+    op: MoveOp, visualisation_data: list[SpaceTimeVisualisationItem]
+) -> None:
+    """Handle the visualisation of a move operation."""
+    from_patch = cast(SurfaceCodeBasePatch, op.patch.type)
+    to_patch = cast(SurfaceCodeBasePatch, op.res.type)
+    from_location = get_patch_location(from_patch)
+    to_location = get_patch_location(to_patch)
+    size = get_patch_size(from_patch)
+    orientation = get_patch_orientation(from_patch)
+    colour_scheme = SideColour.set_colour_scheme(orientation)
+    surface_colour = (
+        SurfaceColour.BLUE if colour_scheme[1] == SideColour.BLUE else SurfaceColour.RED
+    )
+    bridge_patch_types = [cast(SurfaceCodeBasePatch, bridge.type) for bridge in op.bridge_patches]
+    bridge_ids = get_string_list_attr(op, MOVE_BRIDGE_PATCHES_ID)
+    if len(bridge_ids) != len(bridge_patch_types):
+        msg = "MoveOp bridge IDs do not match its bridge patches"
+        raise ValueError(msg)
+
+    from_surface_start_id = get_attr_str(op, IN_OP_ID, "from_start")
+    from_surface_end_id = f"{from_surface_start_id}_end"
+    to_surface_start_id = f"{get_attr_str(op, OUT_OP_ID, 'move')}_start"
+    to_surface_end_id = get_attr_str(op, OUT_OP_ID, "to_end")
+    (from_side, to_side), bridge_visible_sides = get_visible_sides(
+        [from_patch, to_patch], bridge_patch_types
+    )
+
+    from_surface_start: SurfaceData = {
+        "type": "surface",
+        "id": from_surface_start_id,
+        "op_name": op.name,
+        "colour": SurfaceColour.NONE,
+        "location": from_location,
+        "size": size,
+        "startHeight": get_start_height(op),
+    }
+    from_surface_end: SurfaceData = {
+        "type": "surface",
+        "id": from_surface_end_id,
+        "op_name": op.name,
+        "colour": surface_colour,
+        "location": from_location,
+        "size": size,
+        "startHeight": get_end_height(op),
+    }
+    from_surface_sides: SidesData = {
+        "type": "side",
+        "op_name": op.name,
+        "colourScheme": SideColour.set_colour_scheme(get_patch_orientation(from_patch)),
+        "sides": to_side_visibility(from_side),
+        "fromSurfaceId": from_surface_start_id,
+        "toSurfaceId": from_surface_end_id,
+    }
+    visualisation_data.append(from_surface_start)
+    visualisation_data.append(from_surface_end)
+    visualisation_data.append(from_surface_sides)
+
+    for bridge_patch, bridge_id, bridge_visible_side in zip(
+        bridge_patch_types, bridge_ids, bridge_visible_sides, strict=True
+    ):
+        append_move_bridge_data(
+            op,
+            from_patch,
+            bridge_patch,
+            bridge_id,
+            to_side_visibility(bridge_visible_side),
+            visualisation_data,
+        )
+
+    to_surface_start: SurfaceData = {
+        "type": "surface",
+        "id": to_surface_start_id,
+        "op_name": op.name,
+        "colour": surface_colour,
+        "location": to_location,
+        "size": size,
+        "startHeight": get_start_height(op),
+    }
+    to_surface_end: SurfaceData = {
+        "type": "surface",
+        "id": to_surface_end_id,
+        "op_name": op.name,
+        "colour": SurfaceColour.NONE,
+        "location": to_location,
+        "size": size,
+        "startHeight": get_end_height(op),
+    }
+    to_surface_sides: SidesData = {
+        "type": "side",
+        "op_name": op.name,
+        "colourScheme": SideColour.set_colour_scheme(get_patch_orientation(to_patch)),
+        "sides": to_side_visibility(to_side),
+        "fromSurfaceId": to_surface_start_id,
+        "toSurfaceId": to_surface_end_id,
+    }
+    visualisation_data.append(to_surface_start)
+    visualisation_data.append(to_surface_end)
+    visualisation_data.append(to_surface_sides)
+
+
+def append_move_bridge_data(
+    op: MoveOp,
+    from_patch: SurfaceCodeBasePatch,
+    bridge_patch: SurfaceCodeBasePatch,
+    bridge_id: str,
+    bridge_sides: SideVisibility,
+    visualisation_data: list[SpaceTimeVisualisationItem],
+) -> None:
+    """Append the bridge surfaces and sides for a move operation."""
+    orientation = get_patch_orientation(from_patch)
+    colour_scheme = SideColour.set_colour_scheme(orientation)
+    surface_colour = (
+        SurfaceColour.BLUE if colour_scheme[1] == SideColour.BLUE else SurfaceColour.RED
+    )
+    location = get_patch_location(bridge_patch)
+    size = get_patch_size(bridge_patch)
+    bottom_id = f"{bridge_id}_bottom"
+    top_id = f"{bridge_id}_top"
+
+    visualisation_data.extend(
+        [
+            {
+                "type": "surface",
+                "id": bottom_id,
+                "op_name": op.name,
+                "colour": surface_colour,
+                "location": location,
+                "size": size,
+                "startHeight": get_start_height(op),
+            },
+            {
+                "type": "surface",
+                "id": top_id,
+                "op_name": op.name,
+                "colour": surface_colour,
+                "location": location,
+                "size": size,
+                "startHeight": get_end_height(op),
+            },
+            {
+                "type": "side",
+                "op_name": op.name,
+                "colourScheme": colour_scheme,
+                "sides": bridge_sides,
+                "fromSurfaceId": bottom_id,
+                "toSurfaceId": top_id,
+            },
+        ]
+    )
 
 
 def append_rotate_bridge_data(
