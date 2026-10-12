@@ -5,6 +5,7 @@ import pytest
 from deltakit_compile.dialects.logical_assembly import (
     GrowOp,
     MeasStabOp,
+    MoveOp,
     OrientationEnum,
     PlacementAttr,
     RotatedPlanarPatchType,
@@ -145,6 +146,21 @@ class TestInsertHeightSimpleChain:
         InsertHeight().apply(None, ModuleOp([rotate]))
 
         assert _get_heights(rotate) == (0.0, 6.0)
+
+    def test_move_op_advances_height_by_rounds(self) -> None:
+        """MoveOp spans its configured number of rounds."""
+        start_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        end_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([3, 0], OrientationEnum.VERTICAL_Z)
+        )
+        patch = test.TestOp(result_types=[start_type]).res[0]
+        move = MoveOp(patch, 4, [], end_type)
+
+        InsertHeight().apply(None, ModuleOp([move]))
+
+        assert _get_heights(move) == (0.0, 4.0)
 
 
 class TestInsertHeightMultiPauli:

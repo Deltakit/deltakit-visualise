@@ -6,6 +6,7 @@ from deltakit_compile.dialects.logical_assembly import (
     GrowOp,
     MeasStabOp,
     MeasureOp,
+    MoveOp,
     MultiPauliMeasOp,
     OrientationEnum,
     PatchDeclarationOp,
@@ -25,6 +26,7 @@ from deltakit_visualise.constants import (
     IN_BRIDGE_PATCHES_ID,
     IN_LOGICAL_PATCHES_ID,
     IN_OP_ID,
+    MOVE_BRIDGE_PATCHES_ID,
     OUT_BRIDGE_PATCHES_ID,
     OUT_LOGICAL_PATCHES_ID,
     OUT_OP_ID,
@@ -36,6 +38,7 @@ from deltakit_visualise.passes.visualise_spacetime import (
     handle_grow_operation,
     handle_measure_operation,
     handle_measure_stabiliser,
+    handle_move_operation,
     handle_multi_pauli_measurement,
     handle_operation,
     handle_patch_declaration,
@@ -714,6 +717,81 @@ class TestHandleStepOperation:
 
         assert len(visualisation_data) == 3
         assert visualisation_data[2]["location"] == end_location
+
+
+class TestHandleMoveOperation:
+    """Tests for handle_move_operation handler."""
+
+    def test_emits_surfaces_and_hides_sides_connected_to_bridge(self) -> None:
+        """Move side records match the schema and hide faces against bridges."""
+        start_type = RotatedPlanarPatchType(
+            make_size(4, 4), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        bridge_type = RotatedPlanarPatchType(
+            make_size(4, 4), PlacementAttr([4, 0], OrientationEnum.VERTICAL_Z)
+        )
+        end_type = RotatedPlanarPatchType(
+            make_size(4, 4), PlacementAttr([8, 0], OrientationEnum.VERTICAL_Z)
+        )
+        patch, bridge = test.TestOp(result_types=[start_type, bridge_type]).res
+        op = MoveOp(patch, 4, [bridge], end_type)
+        op.attributes[START_HEIGHT_ATTR] = IntAttr(2)
+        op.attributes[END_HEIGHT_ATTR] = IntAttr(6)
+        op.attributes[IN_OP_ID] = StringAttr("move_start")
+        op.attributes[OUT_OP_ID] = StringAttr("move_end")
+        op.attributes[MOVE_BRIDGE_PATCHES_ID] = ArrayAttr([StringAttr("bridge")])
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+
+        handle_move_operation(op, visualisation_data)
+
+        assert [item["type"] for item in visualisation_data] == [
+            "surface",
+            "surface",
+            "side",
+            "surface",
+            "surface",
+            "side",
+            "surface",
+            "surface",
+            "side",
+        ]
+        assert visualisation_data[0]["location"] == (0, 0)
+        assert visualisation_data[0]["startHeight"] == 2.0
+        source_sides = visualisation_data[2]
+        bridge_bottom = visualisation_data[3]
+        bridge_top = visualisation_data[4]
+        bridge_sides = visualisation_data[5]
+        destination_sides = visualisation_data[8]
+        assert source_sides["op_name"] == "log_asm.move"
+        assert source_sides["fromSurfaceId"] == "move_start"
+        assert source_sides["toSurfaceId"] == "move_start_end"
+        assert source_sides["sides"] == {
+            "+X": False,
+            "-X": True,
+            "+Y": True,
+            "-Y": True,
+        }
+        assert bridge_bottom["id"] == "bridge_bottom"
+        assert bridge_bottom["colour"] == SurfaceColour.BLUE
+        assert bridge_bottom["startHeight"] == 2.0
+        assert bridge_top["id"] == "bridge_top"
+        assert bridge_top["colour"] == SurfaceColour.BLUE
+        assert bridge_top["startHeight"] == 6.0
+        assert bridge_sides["colourScheme"] == (SideColour.RED, SideColour.BLUE)
+        assert bridge_sides["fromSurfaceId"] == "bridge_bottom"
+        assert bridge_sides["toSurfaceId"] == "bridge_top"
+        assert visualisation_data[6]["location"] == (8, 0)
+        assert visualisation_data[6]["startHeight"] == 2.0
+        assert visualisation_data[7]["location"] == (8, 0)
+        assert visualisation_data[7]["startHeight"] == 6.0
+        assert destination_sides["fromSurfaceId"] == "move_end_start"
+        assert destination_sides["toSurfaceId"] == "move_end"
+        assert destination_sides["sides"] == {
+            "+X": True,
+            "-X": False,
+            "+Y": True,
+            "-Y": True,
+        }
 
 
 class TestHandleRotateOperation:
