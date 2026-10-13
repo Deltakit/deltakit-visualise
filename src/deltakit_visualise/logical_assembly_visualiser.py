@@ -6,6 +6,7 @@ import logging
 import threading
 from pathlib import Path
 from threading import Thread
+from typing import ClassVar
 
 import uvicorn
 from deltakit_compile.dialects.logical_assembly import LogicalAsm
@@ -59,6 +60,8 @@ class LogicalAssemblyVisualiser:
         >>> data = get_visualisation_data(module_op)
         >>> show(data)
     """
+
+    _active_visualiser: ClassVar["LogicalAssemblyVisualiser | None"] = None
 
     def __init__(
         self,
@@ -171,20 +174,13 @@ class LogicalAssemblyVisualiser:
         return context
 
     def _restart_active_server_if_any(self) -> None:
-        """Stop a previously active visualisation server for this object."""
-        active_server = self._server
-        if active_server is None:
+        """Stop the previous visualisation server, including another instance's."""
+        active_visualiser = LogicalAssemblyVisualiser._active_visualiser or self
+        if active_visualiser._server is None:
             return
 
         logger.info("Server already running, restarting...")
-        active_server.should_exit = True
-
-        active_thread = self._thread
-        if active_thread is not None:
-            active_thread.join()
-
-        self._server = None
-        self._thread = None
+        active_visualiser.stop()
 
     def _run_server_with_tracking(self, server: Server) -> None:
         """Run ``server`` while keeping this instance's active state in sync."""
@@ -196,6 +192,7 @@ class LogicalAssemblyVisualiser:
 
     def _start_server(self, server: Server) -> None:
         """Start ``server`` blocking outside notebooks, else on a background thread."""
+        LogicalAssemblyVisualiser._active_visualiser = self
         try:
             asyncio.get_running_loop()
         except RuntimeError:
@@ -213,6 +210,8 @@ class LogicalAssemblyVisualiser:
 
         This is a convenience method that runs the spacetime visualisation
         pipeline and opens the result in the browser.
+        It replaces any server previously started by another visualiser in
+        this process.
         """
         ctx = self.context
 
@@ -260,3 +259,5 @@ class LogicalAssemblyVisualiser:
 
         self._server = None
         self._thread = None
+        if LogicalAssemblyVisualiser._active_visualiser is self:
+            LogicalAssemblyVisualiser._active_visualiser = None

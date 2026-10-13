@@ -4,6 +4,7 @@
 import contextlib
 import tempfile
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 import uvicorn
@@ -248,6 +249,7 @@ class TestCombinedVisualise:
 @pytest.fixture(name="no_serve")
 def _no_serve(monkeypatch):
     """Stop ``visualise`` from actually serving, keeping the real Config/Server."""
+    monkeypatch.setattr(LogicalAssemblyVisualiser, "_active_visualiser", None)
     monkeypatch.setattr(uvicorn.Server, "run", lambda *_args: None)
 
 
@@ -378,3 +380,40 @@ class TestVisualiseRenderCommand:
         assert first_server.should_exit
         assert vis._server is not first_server
         assert "Server already running, restarting..." in caplog.text
+
+    def test_new_visualiser_restarts_previous_instances_server(self):
+        """Recreating the visualiser releases the previous instance's port."""
+        first = LogicalAssemblyVisualiser.from_log_asm_file(str(QMEM_MLIR_PATH))
+        first.visualise()
+        first_server = first._server
+        assert first_server is not None
+        first_thread = Mock()
+        first._thread = first_thread
+
+        second = LogicalAssemblyVisualiser.from_log_asm_file(str(QMEM_MLIR_PATH))
+        second.visualise()
+
+        assert first_server.should_exit
+        first_thread.join.assert_called_once_with()
+        assert first._server is None
+        assert first._thread is None
+        assert second._server is not None
+        assert second._server is not first_server
+        second.stop()
+
+    def test_stopping_previous_instance_preserves_new_server_tracking(self):
+        """Stopping a replaced instance must not lose the current server owner."""
+        first = LogicalAssemblyVisualiser.from_log_asm_file(str(QMEM_MLIR_PATH))
+        first.visualise()
+        second = LogicalAssemblyVisualiser.from_log_asm_file(str(QMEM_MLIR_PATH))
+        second.visualise()
+        second_server = second._server
+        assert second_server is not None
+
+        first.stop()
+        third = LogicalAssemblyVisualiser.from_log_asm_file(str(QMEM_MLIR_PATH))
+        third.visualise()
+
+        assert second_server.should_exit
+        assert third._server is not None
+        third.stop()
