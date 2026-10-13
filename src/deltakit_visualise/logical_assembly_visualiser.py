@@ -4,6 +4,7 @@
 import asyncio
 import logging
 import threading
+import time
 from pathlib import Path
 from threading import Thread
 from typing import ClassVar
@@ -35,6 +36,18 @@ from deltakit_visualise.visualiser import get_visualisation_data, show
 
 logger = logging.getLogger(__name__)
 
+_SERVER_STARTUP_TIMEOUT_S = 10
+_SERVER_SHUTDOWN_TIMEOUT_S = 5
+
+
+def _in_running_event_loop() -> bool:
+    """Whether an event loop is running in this thread, as inside a Jupyter kernel."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return False
+    return True
+
 
 class LogicalAssemblyVisualiser:
     """Visualisation interface for a single Logical-Assembly program / IR.
@@ -62,6 +75,7 @@ class LogicalAssemblyVisualiser:
     """
 
     _active_visualiser: ClassVar["LogicalAssemblyVisualiser | None"] = None
+    _server_lock: ClassVar[threading.Lock] = threading.Lock()
 
     def __init__(
         self,
@@ -179,31 +193,38 @@ class LogicalAssemblyVisualiser:
         if active_visualiser._server is None:
             return
 
+        thread = active_visualiser._thread
+        if thread is not None and not thread.is_alive():
+            # The server already exited; only its bookkeeping is left to clear.
+            active_visualiser.stop()
+            return
+
         logger.info("Server already running, restarting...")
         active_visualiser.stop()
 
-    def _run_server_with_tracking(self, server: Server) -> None:
-        """Run ``server`` while keeping this instance's active state in sync."""
-        self._server = server
-        try:
-            server.run()
-        finally:
-            pass
+    def _start_server_thread(self, server: Server) -> None:
+        """Run ``server`` on a background thread and wait until it is serving.
 
-    def _start_server(self, server: Server) -> None:
-        """Start ``server`` blocking outside notebooks, else on a background thread."""
-        LogicalAssemblyVisualiser._active_visualiser = self
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            self._run_server_with_tracking(server)
-        else:
-            self._thread = threading.Thread(
-                target=self._run_server_with_tracking,
-                args=(server,),
-                daemon=True,
+        Raises:
+            RuntimeError: If the server exits or times out before it starts,
+                e.g. because its port is already in use.
+        """
+        thread = threading.Thread(target=server.run, daemon=True)
+        self._thread = thread
+        thread.start()
+
+        deadline = time.monotonic() + _SERVER_STARTUP_TIMEOUT_S
+        while not server.started and thread.is_alive() and time.monotonic() < deadline:
+            time.sleep(0.01)
+
+        if not server.started:
+            self.stop()
+            msg = (
+                "Visualisation server failed to start on "
+                f"http://{server.config.host}:{server.config.port} "
+                "(the port may already be in use; see the log above)."
             )
-            self._thread.start()
+            raise RuntimeError(msg)
 
     def visualise(self) -> None:
         """Visualise the program in the browser.
@@ -235,8 +256,6 @@ class LogicalAssemblyVisualiser:
             render_command=RENDER_VISUALISE_COMMAND,
         )
 
-        self._restart_active_server_if_any()
-
         config = uvicorn.Config(
             app,
             host="127.0.0.1",
@@ -245,8 +264,21 @@ class LogicalAssemblyVisualiser:
         )
 
         server = uvicorn.Server(config)
-        self._server = server
-        self._start_server(server)
+
+        # Serialise stop-old/start-new so concurrent calls can't both bind the port.
+        with LogicalAssemblyVisualiser._server_lock:
+            self._restart_active_server_if_any()
+            self._server = server
+            LogicalAssemblyVisualiser._active_visualiser = self
+            if _in_running_event_loop():
+                self._start_server_thread(server)
+                return
+
+        try:
+            server.run()
+        finally:
+            if self._server is server:
+                self.stop()
 
     def stop(self) -> None:
         """Stop the visualisation server."""
@@ -255,7 +287,12 @@ class LogicalAssemblyVisualiser:
             server.should_exit = True
 
         if self._thread is not None:
-            self._thread.join()
+            self._thread.join(timeout=_SERVER_SHUTDOWN_TIMEOUT_S)
+            if self._thread.is_alive():
+                logger.warning(
+                    "Visualisation server did not shut down within %ss.",
+                    _SERVER_SHUTDOWN_TIMEOUT_S,
+                )
 
         self._server = None
         self._thread = None
