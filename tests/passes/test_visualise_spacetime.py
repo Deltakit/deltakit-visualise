@@ -611,6 +611,43 @@ class TestHandleStepOperation:
 class TestHandleRotateOperation:
     """Tests for handle_rotate_operation handler."""
 
+    @pytest.mark.parametrize(
+        ("end_location", "source_hidden", "target_hidden"),
+        [
+            ((4, 0), "+X", "-X"),
+            ((-4, 0), "-X", "+X"),
+            ((0, 4), "+Y", "-Y"),
+            ((0, -4), "-Y", "+Y"),
+        ],
+    )
+    def test_without_bridges_hides_shared_faces(
+        self, end_location: tuple[int, int], source_hidden: str, target_hidden: str
+    ) -> None:
+        """Both halves hide the shared edge while keeping exterior faces visible."""
+        start_type = RotatedPlanarPatchType(
+            make_size(4, 4), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        end_type = RotatedPlanarPatchType(
+            make_size(4, 4), PlacementAttr(end_location, OrientationEnum.HORIZONTAL_Z)
+        )
+        patch = test.TestOp(result_types=[start_type]).res[0]
+        op = RotateOp(patch, 8, end_type)
+        op.attributes[START_HEIGHT_ATTR] = IntAttr(0)
+        op.attributes[END_HEIGHT_ATTR] = IntAttr(8)
+        op.attributes[IN_OP_ID] = StringAttr("rotate_in")
+        op.attributes[OUT_OP_ID] = StringAttr("rotate_out")
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+
+        handle_rotate_operation(op, visualisation_data)
+
+        surfaces = {item["id"]: item for item in visualisation_data if item["type"] == "surface"}
+        connectors = [item for item in visualisation_data if item["type"] in ("side", "rotate")]
+        assert len(connectors) == 4
+        for connector in connectors:
+            location = surfaces[connector["fromSurfaceId"]]["location"]
+            hidden = source_hidden if location == (0, 0) else target_hidden
+            assert connector["sides"] == {side: side != hidden for side in ("+X", "-X", "+Y", "-Y")}
+
     @pytest.mark.parametrize("bridge_count", [1, 3])
     def test_bridge_upper_half_uses_rotate_connector(self, bridge_count: int) -> None:
         """The bridge rotates above its midpoint instead of using straight sides."""
@@ -752,16 +789,10 @@ class TestHandleRotateOperation:
             (surface_ids[0], surface_ids[1]),
             (surface_ids[4], surface_ids[5]),
         ]
-        assert all(
-            data["sides"]
-            == {
-                "+X": True,
-                "-X": True,
-                "+Y": True,
-                "-Y": True,
-            }
-            for data in side_data
-        )
+        assert [data["sides"] for data in side_data] == [
+            {"+X": False, "-X": True, "+Y": True, "-Y": True},
+            {"+X": True, "-X": False, "+Y": True, "-Y": True},
+        ]
         rotate_data = [data for data in visualisation_data if data["type"] == "rotate"]
         assert [data["colourScheme"] for data in rotate_data] == [
             (

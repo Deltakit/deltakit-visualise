@@ -548,52 +548,6 @@ def append_rotate_bridge_data(
             },
         ]
     )
-    print("Adding data to visualisation_data")
-    print([
-        {
-            "type": "surface",
-            "id": bridge_start_id,
-            "op_name": op.name,
-            "colour": rotate_bottom_surface,
-            "location": location,
-            "size": size,
-            "startHeight": bridge_start,
-        },
-        {
-            "type": "surface",
-            "id": bridge_mid_id,
-            "op_name": op.name,
-            "colour": SurfaceColour.NONE,
-            "location": location,
-            "size": size,
-            "startHeight": bridge_mid,
-        },
-        {
-            "type": "surface",
-            "id": bridge_end_id,
-            "op_name": op.name,
-            "colour": rotate_top_surface,
-            "location": location,
-            "size": size,
-            "startHeight": bridge_end,
-        },
-        {
-            "type": "side",
-            "op_name": op.name,
-            "colourScheme": SideColour.set_colour_scheme(from_orientation),
-            "sides": bridge_sides,
-            "fromSurfaceId": bridge_start_id,
-            "toSurfaceId": bridge_mid_id,
-        },
-        {
-            "type": "rotate",
-            "op_name": op.name,
-            "colourScheme": get_rotate_colour_scheme(from_orientation, rotation_direction),
-            "sides": bridge_sides,
-            "fromSurfaceId": bridge_mid_id,
-            "toSurfaceId": bridge_end_id,
-        },
-    ])
 
 
 @handle_operation.register
@@ -619,13 +573,10 @@ def handle_rotate_operation(
     to_mid_id = f"{to_start_id}_rotate_midpoint"
     to_top_id = f"{to_start_id}_rotate_top"
 
-    bridge_patch_types = [
-        cast(SurfaceCodeBasePatch, bridge.type) for bridge in op.bridge_patches
-    ]
-    (from_side,), bridge_from_sides = get_visible_sides(
-        [from_patch], bridge_patch_types
+    bridge_patch_types = [cast(SurfaceCodeBasePatch, bridge.type) for bridge in op.bridge_patches]
+    (from_side, to_side), bridge_visible_sides = get_visible_sides(
+        [from_patch, to_patch], bridge_patch_types
     )
-    (to_side,), bridge_to_sides = get_visible_sides([to_patch], bridge_patch_types)
     from_sides = to_side_visibility(from_side)
     to_sides = to_side_visibility(to_side)
 
@@ -657,8 +608,7 @@ def handle_rotate_operation(
         "colour": SurfaceColour.NONE,
         "location": from_location,
         "size": from_size,
-        "startHeight": get_start_height(op)
-        + (get_end_height(op) - get_start_height(op)) // 2,
+        "startHeight": get_start_height(op) + (get_end_height(op) - get_start_height(op)) // 2,
     }
     # Add top surface for the rotate operation for initial patch with colour
     # based on the rotation direction and orientation of the patch
@@ -698,10 +648,10 @@ def handle_rotate_operation(
     visualisation_data.append(rotate_side_from)
     visualisation_data.append(rotate_from)
 
-    for bridge_index, (bridge_patch, bridge_from_side, bridge_to_side) in enumerate(
-        zip(bridge_patch_types, bridge_from_sides, bridge_to_sides, strict=True)
+    for bridge_index, (bridge_patch, bridge_visible_side) in enumerate(
+        zip(bridge_patch_types, bridge_visible_sides, strict=True)
     ):
-        bridge_sides = to_side_visibility(bridge_from_side, bridge_to_side)
+        bridge_sides = to_side_visibility(bridge_visible_side)
         append_rotate_bridge_data(
             op, bridge_patch, bridge_sides, visualisation_data, bridge_index=bridge_index
         )
@@ -724,8 +674,7 @@ def handle_rotate_operation(
         "colour": SurfaceColour.NONE,
         "location": to_location,
         "size": to_size,
-        "startHeight": get_start_height(op)
-        + (get_end_height(op) - get_start_height(op)) // 2,
+        "startHeight": get_start_height(op) + (get_end_height(op) - get_start_height(op)) // 2,
     }
     # Add top surface for the rotate operation for the target patch (transparent)
     rotate_surface_to_top: SurfaceData = {
