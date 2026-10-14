@@ -205,6 +205,9 @@ class LogicalAssemblyVisualiser:
     def _start_server_thread(self, server: Server) -> None:
         """Run ``server`` on a background thread and wait until it is serving.
 
+        Args:
+            server: The server to start on the background thread.
+
         Raises:
             RuntimeError: If the server exits or times out before it starts,
                 e.g. because its port is already in use.
