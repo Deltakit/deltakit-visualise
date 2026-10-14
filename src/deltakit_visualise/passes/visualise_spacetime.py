@@ -27,7 +27,7 @@ from deltakit_compile.dialects.logical_assembly import (
 from deltakit_compile.dialects.qstruct import OutputOp, ParallelOp, YieldOp
 from xdsl.dialects.builtin import FloatAttr as FloatAttr  # noqa: PLC0414
 from xdsl.dialects.builtin import IntAttr, ModuleOp, StringAttr
-from xdsl.ir import Operation
+from xdsl.ir import Operation, OpResult, SSAValue
 from xdsl.passes import ModulePass
 
 from deltakit_visualise.constants import (
@@ -274,16 +274,28 @@ def handle_measure_stabiliser(
 def handle_measure_operation(
     op: MeasureOp, visualisation_data: list[SpaceTimeVisualisationItem]
 ) -> None:
-    """Handle MeasureOp for visualisation."""
+    """Render measurements, matching move bridge caps to the moved source."""
     patch_type = cast(SurfaceCodeBasePatch, op.patch.type)
     location = get_patch_location(patch_type)
     size = get_patch_size(patch_type)
+    surface_colour = SurfaceColour.set_colour_scheme(op.basis)
+    for use in op.patch.uses:
+        move = use.operation
+        if (
+            isinstance(move, MoveOp)
+            and op.patch in move.bridge_patches
+            and get_end_height(move) == get_start_height(op)
+        ):
+            from_patch = cast(SurfaceCodeBasePatch, move.patch.type)
+            side_colour = SideColour.set_colour_scheme(get_patch_orientation(from_patch))[1]
+            surface_colour = SurfaceColour(side_colour.value)
+            break
     data: SurfaceData = {
         "type": "surface",
         "id": get_attr_str(op, OUT_OP_ID),
         "op_name": op.name,
         "location": location,
-        "colour": SurfaceColour.set_colour_scheme(op.basis),
+        "colour": surface_colour,
         "size": size,
         "startHeight": get_start_height(op),
     }
@@ -589,9 +601,10 @@ def handle_move_operation(
     visualisation_data.append(from_surface_end)
     visualisation_data.append(from_surface_sides)
 
-    for bridge_patch, bridge_id, bridge_visible_side in zip(
-        bridge_patch_types, bridge_ids, bridge_visible_sides, strict=True
+    for bridge, bridge_patch, bridge_id, bridge_visible_side in zip(
+        op.bridge_patches, bridge_patch_types, bridge_ids, bridge_visible_sides, strict=True
     ):
+        start_surface_id, end_surface_id = get_move_bridge_surface_ids(op, bridge)
         append_move_bridge_data(
             op,
             from_patch,
@@ -599,6 +612,8 @@ def handle_move_operation(
             bridge_id,
             to_side_visibility(bridge_visible_side),
             visualisation_data,
+            start_surface_id=start_surface_id,
+            end_surface_id=end_surface_id,
         )
 
     to_surface_start: SurfaceData = {
@@ -632,6 +647,32 @@ def handle_move_operation(
     visualisation_data.append(to_surface_sides)
 
 
+def get_move_bridge_surface_ids(op: MoveOp, bridge: SSAValue) -> tuple[str | None, str | None]:
+    """Find existing preparation and closing measurement surfaces for a bridge."""
+    end_surface_id = next(
+        (
+            get_attr_str(use.operation, OUT_OP_ID)
+            for use in bridge.uses
+            if isinstance(use.operation, MeasureOp)
+            and get_start_height(use.operation) == get_end_height(op)
+        ),
+        None,
+    )
+    while isinstance(bridge, OpResult) and isinstance(bridge.op, ParallelOp):
+        yielded_values: list[SSAValue] = []
+        for region in bridge.op.par_regions:
+            terminator = region.block.last_op
+            if isinstance(terminator, YieldOp):
+                yielded_values.extend(terminator.operands)
+        bridge = yielded_values[bridge.index]
+    start_surface_id = (
+        get_attr_str(bridge.op, IN_OP_ID)
+        if isinstance(bridge, OpResult) and isinstance(bridge.op, PrepareOp)
+        else None
+    )
+    return start_surface_id, end_surface_id
+
+
 def append_move_bridge_data(
     op: MoveOp,
     from_patch: SurfaceCodeBasePatch,
@@ -639,6 +680,9 @@ def append_move_bridge_data(
     bridge_id: str,
     bridge_sides: SideVisibility,
     visualisation_data: list[SpaceTimeVisualisationItem],
+    *,
+    start_surface_id: str | None = None,
+    end_surface_id: str | None = None,
 ) -> None:
     """Append the bridge surfaces and sides for a move operation."""
     orientation = get_patch_orientation(from_patch)
@@ -648,29 +692,28 @@ def append_move_bridge_data(
     )
     location = get_patch_location(bridge_patch)
     size = get_patch_size(bridge_patch)
-    bottom_id = f"{bridge_id}_bottom"
-    top_id = f"{bridge_id}_top"
+    bottom_id = start_surface_id or f"{bridge_id}_bottom"
+    top_id = end_surface_id or f"{bridge_id}_top"
+
+    for surface_id, height, existing_surface_id in (
+        (bottom_id, get_start_height(op), start_surface_id),
+        (top_id, get_end_height(op), end_surface_id),
+    ):
+        if existing_surface_id is None:
+            visualisation_data.append(
+                {
+                    "type": "surface",
+                    "id": surface_id,
+                    "op_name": op.name,
+                    "colour": surface_colour,
+                    "location": location,
+                    "size": size,
+                    "startHeight": height,
+                }
+            )
 
     visualisation_data.extend(
         [
-            {
-                "type": "surface",
-                "id": bottom_id,
-                "op_name": op.name,
-                "colour": surface_colour,
-                "location": location,
-                "size": size,
-                "startHeight": get_start_height(op),
-            },
-            {
-                "type": "surface",
-                "id": top_id,
-                "op_name": op.name,
-                "colour": surface_colour,
-                "location": location,
-                "size": size,
-                "startHeight": get_end_height(op),
-            },
             {
                 "type": "side",
                 "op_name": op.name,
@@ -678,7 +721,7 @@ def append_move_bridge_data(
                 "sides": bridge_sides,
                 "fromSurfaceId": bottom_id,
                 "toSurfaceId": top_id,
-            },
+            }
         ]
     )
 
@@ -1075,4 +1118,5 @@ class VisualiseSpacetime(ModulePass):
         for child in op.walk():
             handle_operation(child, visualisation_data)
         # Store the visualisation_data on the module for later retrieval
+        print(json.dumps(visualisation_data, indent=4))
         op.attributes[VISUALISE_SPACETIME_DATA] = StringAttr(json.dumps(visualisation_data))

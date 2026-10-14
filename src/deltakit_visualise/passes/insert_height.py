@@ -23,9 +23,9 @@ from deltakit_compile.dialects.logical_assembly import (
     ShrinkOp,
     StepOp,
 )
-from deltakit_compile.dialects.qstruct import ParallelOp
+from deltakit_compile.dialects.qstruct import ParallelOp, YieldOp
 from xdsl.dialects.builtin import Float64Type, FloatAttr, ModuleOp
-from xdsl.ir import Operation
+from xdsl.ir import Operation, OpResult, SSAValue
 from xdsl.passes import ModulePass
 
 from deltakit_visualise.constants import END_HEIGHT_ATTR, START_HEIGHT_ATTR
@@ -164,6 +164,19 @@ def handle_move_height(op: MoveOp, tracker: HeightTracker) -> None:
     start, end = tracker.consume(op.rounds.data)
     op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
     op.attributes[END_HEIGHT_ATTR] = FloatAttr(end, Float64Type())
+
+    for bridge in op.bridge_patches:
+        bridge_value: SSAValue = bridge
+        while isinstance(bridge_value, OpResult) and isinstance(bridge_value.op, ParallelOp):
+            yielded_values: list[SSAValue] = []
+            for region in bridge_value.op.par_regions:
+                terminator = region.block.last_op
+                if isinstance(terminator, YieldOp):
+                    yielded_values.extend(terminator.operands)
+            bridge_value = yielded_values[bridge_value.index]
+        if isinstance(bridge_value, OpResult) and isinstance(bridge_value.op, PrepareOp):
+            bridge_value.op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
+            bridge_value.op.attributes[END_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
 
 
 @insert_height.register

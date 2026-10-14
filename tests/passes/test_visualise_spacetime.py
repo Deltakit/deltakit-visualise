@@ -18,6 +18,7 @@ from deltakit_compile.dialects.logical_assembly import (
     StepOp,
 )
 from deltakit_compile.dialects.qcore import PauliAttr
+from deltakit_compile.frontend.logasm import LogAsmBuilder, RotatedPlanarPatch
 from xdsl.dialects import test
 from xdsl.dialects.builtin import ArrayAttr, IntAttr, StringAttr
 
@@ -32,6 +33,7 @@ from deltakit_visualise.constants import (
     OUT_OP_ID,
     START_HEIGHT_ATTR,
 )
+from deltakit_visualise.logical_assembly_visualiser import LogicalAssemblyVisualiser
 from deltakit_visualise.passes.visualise_spacetime import (
     get_end_height,
     get_start_height,
@@ -47,6 +49,7 @@ from deltakit_visualise.passes.visualise_spacetime import (
     handle_shrink_operation,
     handle_step_operation,
 )
+from deltakit_visualise.pipelines.spacetime import SpacetimePipeline
 from deltakit_visualise.types import (
     RotateColour,
     SideColour,
@@ -58,6 +61,7 @@ from deltakit_visualise.utils.attributes import (
     get_patch_orientation,
     get_patch_size,
 )
+from deltakit_visualise.visualiser import get_visualisation_data
 from tests.conftest import make_size
 
 
@@ -1194,6 +1198,67 @@ class TestHandleRotateOperation:
 
 class TestHandleMeasureOperation:
     """Tests for handle_measure_operation handler."""
+
+    @pytest.mark.parametrize("vertical_z", [False, True])
+    @pytest.mark.parametrize("bridge_count", [1, 2])
+    def test_move_bridge_measurements_match_source_top(
+        self, vertical_z: bool, bridge_count: int
+    ) -> None:
+        """Automatic bridge measurements share the moved source's top colour."""
+        builder = LogAsmBuilder()
+        patch = builder.declare_patch(
+            RotatedPlanarPatch(4, 4, location=(0, 0), vertical_z=vertical_z)
+        )
+        bridges = [
+            builder.declare_patch(
+                RotatedPlanarPatch(4, 4, location=(4 * index, 0), vertical_z=vertical_z)
+            )
+            for index in range(1, bridge_count + 1)
+        ]
+        patch.prepare("X")
+        patch.measure_stabilisers(min_rounds=4)
+        patch.move((4 * (bridge_count + 1), 0), bridges=bridges, rounds=4)
+        visualiser = LogicalAssemblyVisualiser(builder)
+
+        SpacetimePipeline().apply(visualiser.context, visualiser.module)
+
+        items = get_visualisation_data(visualiser.module)["ops"]
+        source_top = next(
+            item
+            for item in items
+            if item["type"] == "surface"
+            and item["op_name"] == "log_asm.move"
+            and item["location"] == [0, 0]
+            and item["startHeight"] == 8
+        )
+        measurements = [item for item in items if item["op_name"] == "log_asm.measure"]
+        assert len(measurements) == bridge_count
+        assert all(item["colour"] == source_top["colour"] for item in measurements)
+        assert all(item["startHeight"] == source_top["startHeight"] for item in measurements)
+        move_sides = [
+            item for item in items if item["type"] == "side" and item["op_name"] == "log_asm.move"
+        ]
+        side_endpoints = {(item["fromSurfaceId"], item["toSurfaceId"]) for item in move_sides}
+        for measurement in measurements:
+            preparation = next(
+                item
+                for item in items
+                if item["op_name"] == "log_asm.prepare"
+                and item["location"] == measurement["location"]
+            )
+            assert (preparation["id"], measurement["id"]) in side_endpoints
+            assert preparation["startHeight"] == 4
+            assert not any(
+                item["type"] == "surface"
+                and item["op_name"] == "log_asm.move"
+                and item["location"] == measurement["location"]
+                for item in items
+            )
+        surface_ids = {item["id"] for item in items if item["type"] == "surface"}
+        assert all(
+            item["fromSurfaceId"] in surface_ids and item["toSurfaceId"] in surface_ids
+            for item in move_sides
+        )
 
     @pytest.mark.parametrize(
         ("basis", "expected_colour"),
