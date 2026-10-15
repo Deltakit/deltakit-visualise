@@ -1,3 +1,4 @@
+// RUN: %visualise "%s" -O %t.json && %filecheck "%s" --input-file %t.json
 builtin.module {
   %qreg = log_asm.patch_dec -> !log_asm.patch.rot_planar<size=(4, 4), location=(0.0, 0.0), orient=v_z>
   %qreg_1 = log_asm.patch_dec -> !log_asm.patch.rot_planar<size=(2, 4), location=(4.0, 0.0), orient=v_z>
@@ -8,3 +9,28 @@ builtin.module {
   %cexpr = log_asm.measure<X> (%qreg_5 : !log_asm.patch.rot_planar<size=(4, 4), location=(6.0, 0.0), orient=h_z>) -> i1
   qstruct.output(:)
 }
+// CHECK: {"type": "spacetime", "ops": [{"type": "surface", "id": "qreg", "op_name": "log_asm.patch_dec", "location": [0.0, 0.0], "colour": "GREY", "size": [4, 4], "startHeight": 0.0},
+// CHECK-SAME: {"type": "surface", "id": "qreg_1", "op_name": "log_asm.patch_dec", "location": [4.0, 0.0], "colour": "GREY", "size": [2, 4], "startHeight": 0.0},
+// CHECK-SAME: {"type": "surface", "id": "qreg_2", "op_name": "log_asm.prepare", "location": [0.0, 0.0], "colour": "BLUE", "size": [4, 4], "startHeight": 0.0},
+// CHECK-SAME: {"type": "surface", "id": "gen_id_0", "op_name": "log_asm.meas_stab", "colour": "NONE", "location": [0.0, 0.0], "size": [4, 4], "startHeight": 0.0},
+// CHECK-SAME: {"type": "side", "op_name": "log_asm.meas_stab", "colourScheme": ["RED", "BLUE"], "sides": {"+X": true, "-X": true, "+Y": true, "-Y": true}, "fromSurfaceId": "gen_id_0", "toSurfaceId": "qreg_3"},
+// CHECK-SAME: {"type": "surface", "id": "qreg_3", "op_name": "log_asm.meas_stab", "colour": "NONE", "location": [0.0, 0.0], "size": [4, 4], "startHeight": 4.0},
+// CHECK-SAME: {"type": "surface", "id": "gen_id_1", "op_name": "log_asm.rotate", "colour": "NONE", "location": [0.0, 0.0], "size": [4, 4], "startHeight": 4.0},
+// CHECK-SAME: {"type": "surface", "id": "gen_id_1_rotate_midpoint", "op_name": "log_asm.rotate", "colour": "NONE", "location": [0.0, 0.0], "size": [4, 4], "startHeight": 8.0},
+// CHECK-SAME: {"type": "surface", "id": "gen_id_1_rotate_top", "op_name": "log_asm.rotate", "colour": "BLUE", "location": [0.0, 0.0], "size": [4, 4], "startHeight": 12.0},
+// CHECK-SAME: {"type": "side", "op_name": "log_asm.rotate", "colourScheme": ["RED", "BLUE"], "sides": {"+X": false, "-X": true, "+Y": true, "-Y": true}, "fromSurfaceId": "gen_id_1", "toSurfaceId": "gen_id_1_rotate_midpoint"},
+// CHECK-SAME: {"type": "rotate", "op_name": "log_asm.rotate", "colourScheme": ["BLUE", "RED", "RED", "BLUE"], "sides": {"+X": false, "-X": true, "+Y": true, "-Y": true}, "fromSurfaceId": "gen_id_1_rotate_midpoint", "toSurfaceId": "gen_id_1_rotate_top"},
+// CHECK-SAME: {"type": "surface", "id": "gen_id_1_bridge_0_to_4.0", "op_name": "log_asm.rotate", "colour": "RED", "location": [4.0, 0.0], "size": [2, 4], "startHeight": 4.0},
+// CHECK-SAME: {"type": "surface", "id": "gen_id_1_bridge_0_rotate_midpoint_to_8.0", "op_name": "log_asm.rotate", "colour": "NONE", "location": [4.0, 0.0], "size": [2, 4], "startHeight": 8.0},
+// CHECK-SAME: {"type": "surface", "id": "gen_id_1_bridge_0_rotate_top_to_12.0", "op_name": "log_asm.rotate", "colour": "BLUE", "location": [4.0, 0.0], "size": [2, 4], "startHeight": 12.0},
+// CHECK-SAME: {"type": "side", "op_name": "log_asm.rotate", "colourScheme": ["RED", "BLUE"], "sides": {"+X": false, "-X": false, "+Y": true, "-Y": true}, "fromSurfaceId": "gen_id_1_bridge_0_to_4.0", "toSurfaceId": "gen_id_1_bridge_0_rotate_midpoint_to_8.0"},
+// CHECK-SAME: {"type": "rotate", "op_name": "log_asm.rotate", "colourScheme": ["BLUE", "RED", "RED", "BLUE"], "sides": {"+X": false, "-X": false, "+Y": true, "-Y": true}, "fromSurfaceId": "gen_id_1_bridge_0_rotate_midpoint_to_8.0", "toSurfaceId": "gen_id_1_bridge_0_rotate_top_to_12.0"},
+// CHECK-SAME: {"type": "surface", "id": "qreg_4", "op_name": "log_asm.rotate", "colour": "RED", "location": [6.0, 0.0], "size": [4, 4], "startHeight": 4.0},
+// CHECK-SAME: {"type": "surface", "id": "qreg_4_rotate_midpoint", "op_name": "log_asm.rotate", "colour": "NONE", "location": [6.0, 0.0], "size": [4, 4], "startHeight": 8.0},
+// CHECK-SAME: {"type": "surface", "id": "qreg_4_rotate_top", "op_name": "log_asm.rotate", "colour": "NONE", "location": [6.0, 0.0], "size": [4, 4], "startHeight": 12.0},
+// CHECK-SAME: {"type": "side", "op_name": "log_asm.rotate", "colourScheme": ["BLUE", "RED"], "sides": {"+X": true, "-X": false, "+Y": true, "-Y": true}, "fromSurfaceId": "qreg_4_rotate_midpoint", "toSurfaceId": "qreg_4_rotate_top"},
+// CHECK-SAME: {"type": "rotate", "op_name": "log_asm.rotate", "colourScheme": ["BLUE", "RED", "BLUE", "RED"], "sides": {"+X": true, "-X": false, "+Y": true, "-Y": true}, "fromSurfaceId": "qreg_4", "toSurfaceId": "qreg_4_rotate_midpoint"},
+// CHECK-SAME: {"type": "surface", "id": "gen_id_2", "op_name": "log_asm.meas_stab", "colour": "NONE", "location": [6.0, 0.0], "size": [4, 4], "startHeight": 12.0},
+// CHECK-SAME: {"type": "side", "op_name": "log_asm.meas_stab", "colourScheme": ["BLUE", "RED"], "sides": {"+X": true, "-X": true, "+Y": true, "-Y": true}, "fromSurfaceId": "gen_id_2", "toSurfaceId": "qreg_5"},
+// CHECK-SAME: {"type": "surface", "id": "qreg_5", "op_name": "log_asm.meas_stab", "colour": "NONE", "location": [6.0, 0.0], "size": [4, 4], "startHeight": 16.0},
+// CHECK-SAME: {"type": "surface", "id": "cexpr", "op_name": "log_asm.measure", "location": [6.0, 0.0], "colour": "RED", "size": [4, 4], "startHeight": 16.0}]}
