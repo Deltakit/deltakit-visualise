@@ -9,6 +9,7 @@ from deltakit_compile.dialects.logical_assembly import (
     OrientationEnum,
     PlacementAttr,
     RotatedPlanarPatchType,
+    RotateOp,
     StepOp,
 )
 from xdsl.dialects import test
@@ -398,6 +399,29 @@ class TestAssignIdStep:
 
         in_id = _get_in_id(step)
         out_id = _get_out_id(step)
+        assert in_id
+        assert out_id
+        assert in_id != out_id
+
+
+class TestAssignIdRotate:
+    """Tests for AssignId pass with RotateOp."""
+
+    def test_rotate_has_non_empty_in_and_out_ids(self) -> None:
+        """Test that RotateOp gets IDs for both connected surfaces."""
+        start_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        end_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([3, 0], OrientationEnum.HORIZONTAL_Z)
+        )
+        patch = test.TestOp(result_types=[start_type]).res[0]
+        rotate = RotateOp(patch, 6, end_type)
+
+        AssignId().apply(None, ModuleOp([rotate]))
+
+        in_id = _get_in_id(rotate)
+        out_id = _get_out_id(rotate)
         assert in_id
         assert out_id
         assert in_id != out_id

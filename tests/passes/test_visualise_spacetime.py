@@ -12,6 +12,7 @@ from deltakit_compile.dialects.logical_assembly import (
     PlacementAttr,
     PrepareOp,
     RotatedPlanarPatchType,
+    RotateOp,
     ShrinkOp,
     StepOp,
 )
@@ -39,13 +40,20 @@ from deltakit_visualise.passes.visualise_spacetime import (
     handle_operation,
     handle_patch_declaration,
     handle_prepare_operation,
+    handle_rotate_operation,
     handle_shrink_operation,
     handle_step_operation,
 )
 from deltakit_visualise.types import (
+    RotateColour,
     SideColour,
     SpaceTimeVisualisationItem,
     SurfaceColour,
+)
+from deltakit_visualise.utils.attributes import (
+    get_patch_location,
+    get_patch_orientation,
+    get_patch_size,
 )
 from tests.conftest import make_size
 
@@ -124,23 +132,21 @@ class TestHandlePrepareOperation:
     """Tests for handle_prepare_operation handler."""
 
     @pytest.mark.parametrize(
-        ("basis", "expected_colour"),
+        ("orientation", "expected_colour"),
         [
-            (PauliAttr.X(), SurfaceColour.RED),
-            (PauliAttr.Z(), SurfaceColour.BLUE),
+            (OrientationEnum.VERTICAL_Z, SurfaceColour.BLUE),
+            (OrientationEnum.HORIZONTAL_Z, SurfaceColour.RED),
         ],
     )
     def test_with_placement_outputs_coloured_surface(
         self,
-        basis: PauliAttr,
+        orientation: OrientationEnum,
         expected_colour: SurfaceColour,
     ):
         """Test that PrepareOp with placement outputs correctly coloured surface."""
-        patch_type = RotatedPlanarPatchType(
-            make_size(5, 5), PlacementAttr([1, 1], OrientationEnum.VERTICAL_Z)
-        )
+        patch_type = RotatedPlanarPatchType(make_size(5, 5), PlacementAttr([1, 1], orientation))
         patch = test.TestOp(result_types=[patch_type]).res[0]
-        op = PrepareOp(patch, basis)
+        op = PrepareOp(patch, PauliAttr.X())
         op.attributes[START_HEIGHT_ATTR] = IntAttr(0)
         op.attributes[IN_OP_ID] = StringAttr("patch_A_1_")
         visualisation_data: list[SpaceTimeVisualisationItem] = []
@@ -206,6 +212,38 @@ class TestHandleMeasStabOp:
         assert surface_data["size"] == (5, 5)
         assert "id" in surface_data
         assert "startHeight" in surface_data
+
+    @pytest.mark.parametrize(
+        ("orientation", "expected_colours"),
+        [
+            (OrientationEnum.VERTICAL_Z, (SideColour.RED, SideColour.BLUE)),
+            (OrientationEnum.HORIZONTAL_Z, (SideColour.BLUE, SideColour.RED)),
+        ],
+    )
+    @pytest.mark.parametrize("basis", [PauliAttr.X(), PauliAttr.Z()])
+    def test_uses_patch_orientation_for_side_colours(
+        self,
+        orientation: OrientationEnum,
+        expected_colours: tuple[SideColour, SideColour],
+        basis: PauliAttr,
+    ) -> None:
+        """Side colours depend only on the patch orientation, not the prepare basis."""
+        patch_type = RotatedPlanarPatchType(
+            make_size(5, 5),
+            PlacementAttr([1, 1], orientation),
+        )
+        patch = test.TestOp(result_types=[patch_type]).res[0]
+        prepare = PrepareOp(patch, basis)
+        op = MeasStabOp(prepare.res, 10)
+        op.attributes[START_HEIGHT_ATTR] = IntAttr(0)
+        op.attributes[END_HEIGHT_ATTR] = IntAttr(10)
+        op.attributes[IN_OP_ID] = StringAttr("patch_A_1_")
+        op.attributes[OUT_OP_ID] = StringAttr("patch_A_2_")
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+
+        handle_measure_stabiliser(op, visualisation_data)
+
+        assert visualisation_data[1]["colourScheme"] == expected_colours
 
 
 class TestHandleGrowOp:
@@ -569,54 +607,280 @@ class TestHandleStepOperation:
         assert len(visualisation_data) == 3
         assert visualisation_data[2]["location"] == end_location
 
-    def test_four_steps_restore_initial_patch_geometry(self):
-        """Test that four offset steps return a 4x4 patch to its initial geometry."""
-        initial_location = (1.0, 1.0)
-        initial_type = RotatedPlanarPatchType(
-            make_size(4, 4), PlacementAttr(initial_location, OrientationEnum.VERTICAL_Z)
-        )
-        patch = test.TestOp(result_types=[initial_type]).res[0]
-        step_deltas = [(0.5, -0.5), (0.5, -0.5), (-0.5, 0.5), (-0.5, 0.5)]
-        expected_locations = [
-            (1.5, 0.5),
-            (2.0, 0.0),
-            (1.5, 0.5),
-            initial_location,
-        ]
-        step_operations = []
-        current_patch = patch
-        current_location = initial_location
-        input_id = "patch_initial"
 
-        for index, (delta_x, delta_y) in enumerate(step_deltas, start=1):
-            current_location = (current_location[0] + delta_x, current_location[1] + delta_y)
-            destination_type = RotatedPlanarPatchType(
-                make_size(4, 4),
-                PlacementAttr(current_location, OrientationEnum.VERTICAL_Z),
+class TestHandleRotateOperation:
+    """Tests for handle_rotate_operation handler."""
+
+    @pytest.mark.parametrize(
+        ("end_location", "source_hidden", "target_hidden"),
+        [
+            ((4, 0), "+X", "-X"),
+            ((-4, 0), "-X", "+X"),
+            ((0, 4), "+Y", "-Y"),
+            ((0, -4), "-Y", "+Y"),
+        ],
+    )
+    def test_without_bridges_hides_shared_faces(
+        self, end_location: tuple[int, int], source_hidden: str, target_hidden: str
+    ) -> None:
+        """Both halves hide the shared edge while keeping exterior faces visible."""
+        start_type = RotatedPlanarPatchType(
+            make_size(4, 4), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        end_type = RotatedPlanarPatchType(
+            make_size(4, 4), PlacementAttr(end_location, OrientationEnum.HORIZONTAL_Z)
+        )
+        patch = test.TestOp(result_types=[start_type]).res[0]
+        op = RotateOp(patch, 8, end_type)
+        op.attributes[START_HEIGHT_ATTR] = IntAttr(0)
+        op.attributes[END_HEIGHT_ATTR] = IntAttr(8)
+        op.attributes[IN_OP_ID] = StringAttr("rotate_in")
+        op.attributes[OUT_OP_ID] = StringAttr("rotate_out")
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+
+        handle_rotate_operation(op, visualisation_data)
+
+        surfaces = {item["id"]: item for item in visualisation_data if item["type"] == "surface"}
+        connectors = [item for item in visualisation_data if item["type"] in ("side", "rotate")]
+        assert len(connectors) == 4
+        for connector in connectors:
+            location = surfaces[connector["fromSurfaceId"]]["location"]
+            hidden = source_hidden if location == (0, 0) else target_hidden
+            assert connector["sides"] == {side: side != hidden for side in ("+X", "-X", "+Y", "-Y")}
+
+    @pytest.mark.parametrize("bridge_count", [1, 3])
+    def test_bridge_upper_half_uses_rotate_connector(self, bridge_count: int) -> None:
+        """The bridge rotates above its midpoint instead of using straight sides."""
+        start_type = RotatedPlanarPatchType(
+            make_size(4, 4), PlacementAttr([0, 0], OrientationEnum.HORIZONTAL_Z)
+        )
+        bridge_height = 4 if bridge_count == 1 else 2
+        bridge_locations = [(0, 4 + index * bridge_height) for index in range(bridge_count)]
+        bridges = [
+            test.TestOp(
+                result_types=[
+                    RotatedPlanarPatchType(
+                        make_size(4, bridge_height),
+                        PlacementAttr(location, OrientationEnum.VERTICAL_Z),
+                    )
+                ]
+            ).res[0]
+            for location in bridge_locations
+        ]
+        end_type = RotatedPlanarPatchType(
+            make_size(4, 4),
+            PlacementAttr([0, 4 + bridge_count * bridge_height], OrientationEnum.VERTICAL_Z),
+        )
+        patch = test.TestOp(result_types=[start_type]).res[0]
+        op = RotateOp(patch, 8, end_type, bridges=bridges)
+        op.attributes[START_HEIGHT_ATTR] = IntAttr(4)
+        op.attributes[END_HEIGHT_ATTR] = IntAttr(12)
+        op.attributes[IN_OP_ID] = StringAttr("rotate_in")
+        op.attributes[OUT_OP_ID] = StringAttr("rotate_out")
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+
+        handle_rotate_operation(op, visualisation_data)
+
+        surfaces = [item for item in visualisation_data if item["type"] == "surface"]
+        assert len({item["id"] for item in surfaces}) == len(surfaces)
+        surfaces_by_id = {item["id"]: item for item in surfaces}
+        for location in bridge_locations:
+            location_ids = {item["id"] for item in surfaces if item["location"] == location}
+            connectors = [
+                item
+                for item in visualisation_data
+                if item["type"] in ("side", "rotate") and item["fromSurfaceId"] in location_ids
+            ]
+            assert [item["type"] for item in connectors] == ["side", "rotate"]
+            for connector in connectors:
+                assert surfaces_by_id[connector["fromSurfaceId"]]["location"] == location
+                assert surfaces_by_id[connector["toSurfaceId"]]["location"] == location
+        bridge_surfaces = [
+            item
+            for item in visualisation_data
+            if item["type"] == "surface" and item["location"] == (0, 4)
+        ]
+        assert [item["startHeight"] for item in bridge_surfaces] == [4, 8, 12]
+        bridge_ids = [item["id"] for item in bridge_surfaces]
+        bridge_connectors = [
+            item
+            for item in visualisation_data
+            if item["type"] in ("side", "rotate") and item["fromSurfaceId"] in bridge_ids
+        ]
+        assert [item["type"] for item in bridge_connectors] == ["side", "rotate"]
+        assert [(item["fromSurfaceId"], item["toSurfaceId"]) for item in bridge_connectors] == [
+            (bridge_ids[0], bridge_ids[1]),
+            (bridge_ids[1], bridge_ids[2]),
+        ]
+        assert bridge_connectors[1]["colourScheme"] == (
+            RotateColour.BLUE,
+            RotateColour.RED,
+            RotateColour.BLUE,
+            RotateColour.RED,
+        )
+        assert bridge_connectors[1]["sides"] == {
+            "+X": True,
+            "-X": True,
+            "+Y": False,
+            "-Y": False,
+        }
+
+    def test_outputs_rotation_surfaces_and_connectors(self) -> None:
+        """Test that RotateOp outputs the requested reused-surface rotation shape."""
+        start_type = RotatedPlanarPatchType(
+            make_size(5, 5), PlacementAttr([1, 1], OrientationEnum.VERTICAL_Z)
+        )
+        end_type = RotatedPlanarPatchType(
+            make_size(5, 5), PlacementAttr([6, 1], OrientationEnum.HORIZONTAL_Z)
+        )
+        patch = test.TestOp(result_types=[start_type]).res[0]
+        op = RotateOp(patch, 10, end_type)
+        op.attributes[START_HEIGHT_ATTR] = IntAttr(0)
+        op.attributes[END_HEIGHT_ATTR] = IntAttr(10)
+        op.attributes[IN_OP_ID] = StringAttr("patch_A_0_")
+        op.attributes[OUT_OP_ID] = StringAttr("patch_A_10_")
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+
+        handle_operation(op, visualisation_data)
+
+        assert handle_operation.dispatch(RotateOp) is handle_rotate_operation
+        assert [data["type"] for data in visualisation_data] == [
+            "surface",
+            "surface",
+            "surface",
+            "side",
+            "rotate",
+            "surface",
+            "surface",
+            "surface",
+            "side",
+            "rotate",
+        ]
+        assert [
+            data["startHeight"] for data in visualisation_data if data["type"] == "surface"
+        ] == [0, 5, 10, 0, 5, 10]
+        assert [data["location"] for data in visualisation_data if data["type"] == "surface"] == [
+            (1, 1),
+            (1, 1),
+            (1, 1),
+            (6, 1),
+            (6, 1),
+            (6, 1),
+        ]
+        assert [data["colour"] for data in visualisation_data if data["type"] == "surface"] == [
+            SurfaceColour.NONE,
+            SurfaceColour.NONE,
+            SurfaceColour.BLUE,
+            SurfaceColour.RED,
+            SurfaceColour.NONE,
+            SurfaceColour.NONE,
+        ]
+        assert all(
+            data["size"] == (5, 5) for data in visualisation_data if data["type"] == "surface"
+        )
+
+        surface_ids = [data["id"] for data in visualisation_data if data["type"] == "surface"]
+        side_data = [data for data in visualisation_data if data["type"] == "side"]
+        assert [data["colourScheme"] for data in side_data] == [
+            (SideColour.RED, SideColour.BLUE),
+            (SideColour.BLUE, SideColour.RED),
+        ]
+        assert [(data["fromSurfaceId"], data["toSurfaceId"]) for data in side_data] == [
+            (surface_ids[0], surface_ids[1]),
+            (surface_ids[4], surface_ids[5]),
+        ]
+        assert [data["sides"] for data in side_data] == [
+            {"+X": False, "-X": True, "+Y": True, "-Y": True},
+            {"+X": True, "-X": False, "+Y": True, "-Y": True},
+        ]
+        rotate_data = [data for data in visualisation_data if data["type"] == "rotate"]
+        assert [data["colourScheme"] for data in rotate_data] == [
+            (
+                RotateColour.BLUE,
+                RotateColour.RED,
+                RotateColour.RED,
+                RotateColour.BLUE,
+            ),
+            (
+                RotateColour.BLUE,
+                RotateColour.RED,
+                RotateColour.BLUE,
+                RotateColour.RED,
+            ),
+        ]
+
+    def test_uses_patch_orientations_independently_of_prepare_basis(self) -> None:
+        """Rotate styling follows patch orientations, not preparation basis."""
+        start_type = RotatedPlanarPatchType(
+            make_size(5, 5),
+            PlacementAttr([1, 1], OrientationEnum.VERTICAL_Z),
+        )
+        end_type = RotatedPlanarPatchType(
+            make_size(5, 5),
+            PlacementAttr([6, 1], OrientationEnum.HORIZONTAL_Z),
+        )
+        patch = test.TestOp(result_types=[start_type]).res[0]
+        prepare = PrepareOp(patch, PauliAttr.X())
+        measurement = MeasStabOp(prepare.res, 5)
+        op = RotateOp(measurement.res, 10, end_type)
+        op.attributes[START_HEIGHT_ATTR] = IntAttr(5)
+        op.attributes[END_HEIGHT_ATTR] = IntAttr(15)
+        op.attributes[IN_OP_ID] = StringAttr("patch_A_5_")
+        op.attributes[OUT_OP_ID] = StringAttr("patch_A_15_")
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+
+        handle_rotate_operation(op, visualisation_data)
+
+        rotate_data = next(data for data in visualisation_data if data["type"] == "rotate")
+        assert rotate_data["colourScheme"] == (
+            RotateColour.BLUE,
+            RotateColour.RED,
+            RotateColour.RED,
+            RotateColour.BLUE,
+        )
+
+    def test_four_rotations_restore_initial_patch_geometry(self) -> None:
+        """Four axis-aligned rotations return a 4x4 patch to its initial geometry."""
+        initial_type = RotatedPlanarPatchType(
+            make_size(4, 4), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        offsets = [(0, 4), (8, 0), (0, -4), (-8, 0)]
+        end_orientations = [
+            OrientationEnum.HORIZONTAL_Z,
+            OrientationEnum.VERTICAL_Z,
+            OrientationEnum.HORIZONTAL_Z,
+            OrientationEnum.VERTICAL_Z,
+        ]
+        patch = test.TestOp(result_types=[initial_type]).res[0]
+        current_location = (0.0, 0.0)
+        rotate_operations = []
+
+        for index, ((offset_x, offset_y), orientation) in enumerate(
+            zip(offsets, end_orientations, strict=True), start=1
+        ):
+            current_location = (
+                current_location[0] + offset_x,
+                current_location[1] + offset_y,
             )
-            step_op = StepOp(current_patch, destination_type)
-            output_id = f"patch_step_{index}"
-            step_op.attributes[START_HEIGHT_ATTR] = IntAttr(index - 1)
-            step_op.attributes[END_HEIGHT_ATTR] = IntAttr(index)
-            step_op.attributes[IN_OP_ID] = StringAttr(input_id)
-            step_op.attributes[OUT_OP_ID] = StringAttr(output_id)
-            step_operations.append(step_op)
-            current_patch = step_op.res
-            input_id = output_id
+            destination_type = RotatedPlanarPatchType(
+                make_size(4, 4), PlacementAttr(current_location, orientation)
+            )
+            rotate_op = RotateOp(patch, 4, destination_type)
+            rotate_op.attributes[START_HEIGHT_ATTR] = IntAttr((index - 1) * 4)
+            rotate_op.attributes[END_HEIGHT_ATTR] = IntAttr(index * 4)
+            rotate_op.attributes[IN_OP_ID] = StringAttr(f"patch_{index - 1}")
+            rotate_op.attributes[OUT_OP_ID] = StringAttr(f"patch_{index}")
+            rotate_operations.append(rotate_op)
+            patch = rotate_op.res
 
         visualisation_data: list[SpaceTimeVisualisationItem] = []
-        for step_op in step_operations:
-            handle_step_operation(step_op, visualisation_data)
+        for rotate_op in rotate_operations:
+            handle_rotate_operation(rotate_op, visualisation_data)
 
-        initial_surface = visualisation_data[0]
-        final_surface = visualisation_data[-1]
-        actual_step_locations = [
-            visualisation_data[index * 3 + 2]["location"] for index in range(4)
-        ]
-
-        assert actual_step_locations == expected_locations
-        assert final_surface["location"] == initial_surface["location"]
-        assert final_surface["size"] == initial_surface["size"]
+        final_type = patch.type
+        assert get_patch_location(final_type) == get_patch_location(initial_type)
+        assert get_patch_size(final_type) == get_patch_size(initial_type)
+        assert get_patch_orientation(final_type) == get_patch_orientation(initial_type)
 
 
 class TestHandleMeasureOperation:
