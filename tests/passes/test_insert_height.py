@@ -5,18 +5,23 @@ import pytest
 from deltakit_compile.dialects.logical_assembly import (
     GrowOp,
     MeasStabOp,
+    MeasureOp,
+    MoveOp,
     OrientationEnum,
     PlacementAttr,
+    PrepareOp,
     RotatedPlanarPatchType,
     RotateOp,
     StepOp,
 )
 from deltakit_compile.dialects.qstruct import ParallelOp, YieldOp
+from deltakit_compile.frontend.logasm import LogAsmBuilder, RotatedPlanarPatch
 from xdsl.dialects import test
 from xdsl.dialects.builtin import FloatAttr, ModuleOp
 from xdsl.ir import Block, Operation, Region
 
 from deltakit_visualise.constants import END_HEIGHT_ATTR, START_HEIGHT_ATTR
+from deltakit_visualise.logical_assembly_visualiser import LogicalAssemblyVisualiser
 from deltakit_visualise.passes.insert_height import InsertHeight
 from tests.conftest import (
     MakeBridgePatch,
@@ -145,6 +150,51 @@ class TestInsertHeightSimpleChain:
         InsertHeight().apply(None, ModuleOp([rotate]))
 
         assert _get_heights(rotate) == (0.0, 6.0)
+
+    def test_move_op_advances_height_by_rounds(self) -> None:
+        """MoveOp spans its configured number of rounds."""
+        start_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        end_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([3, 0], OrientationEnum.VERTICAL_Z)
+        )
+        patch = test.TestOp(result_types=[start_type]).res[0]
+        move = MoveOp(patch, 4, [], end_type)
+
+        InsertHeight().apply(None, ModuleOp([move]))
+
+        assert _get_heights(move) == (0.0, 4.0)
+
+    @pytest.mark.parametrize("explicit_bridges", [False, True])
+    @pytest.mark.parametrize("stabiliser_rounds", [4, 9])
+    def test_move_bridge_preparation_starts_with_move(
+        self, explicit_bridges: bool, stabiliser_rounds: int
+    ) -> None:
+        """Bridge preparation aligns with the move without delaying source preparation."""
+        builder = LogAsmBuilder()
+        patch = builder.declare_patch(RotatedPlanarPatch(4, 4, location=(0, 0)))
+        bridges = (
+            [builder.declare_patch(RotatedPlanarPatch(4, 4, location=(4, 0)))]
+            if explicit_bridges
+            else None
+        )
+        patch.prepare("X")
+        patch.measure_stabilisers(min_rounds=stabiliser_rounds)
+        patch.move((8, 0), bridges=bridges, rounds=6)
+        visualiser = LogicalAssemblyVisualiser(builder)
+        module = visualiser.module
+
+        InsertHeight().apply(visualiser.context, module)
+
+        move = next(op for op in module.walk() if isinstance(op, MoveOp))
+        assert _get_heights(move) == (stabiliser_rounds, stabiliser_rounds + 6)
+        preparations = [op for op in module.walk() if isinstance(op, PrepareOp)]
+        source_prepare, bridge_prepare = preparations
+        assert _get_heights(source_prepare) == (0, 0)
+        assert _get_heights(bridge_prepare) == (stabiliser_rounds, stabiliser_rounds)
+        measure = next(op for op in module.walk() if isinstance(op, MeasureOp))
+        assert _get_heights(measure) == (stabiliser_rounds + 6, stabiliser_rounds + 6)
 
 
 class TestInsertHeightMultiPauli:
