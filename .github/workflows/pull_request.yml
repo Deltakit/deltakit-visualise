@@ -34,7 +34,7 @@ jobs:
         dependency-resolution: ['highest', 'lowest-direct']
     name: Test deltakit-visualise on ${{ matrix.python-version }} with ${{matrix.dependency-resolution}}
     env:
-      ENABLE_COVERAGE: ${{ (matrix.python-version == '3.10') && (matrix.dependency-resolution == 'highest') }}
+      ENABLE_COVERAGE: ${{ (matrix.python-version == '3.11') && (matrix.dependency-resolution == 'highest') }}
       # See https://github.com/orgs/community/discussions/25217
       PR_FROM_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
       PR_FROM_DEPENDABOT: ${{ startsWith(github.head_ref, 'dependabot/' )}}
