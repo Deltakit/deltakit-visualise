@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=83.0.0", "wheel", "python-decouple>=3.8"]
+requires = ["setuptools>=84.1.0,<85", "wheel", "python-decouple>=3.8"]
 build-backend = "build"
 backend-path = ["."]
 
@@ -8,7 +8,7 @@ name = "deltakit-visualise"
 version = "0.4.0"
 description = "Deltakit (component deltakit-visualise)"
 readme = "README.md"
-requires-python = ">=3.10, <3.15"
+requires-python = ">=3.11, <3.16"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 
@@ -24,11 +24,11 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
   "Programming Language :: JavaScript",
   "Topic :: Scientific/Engineering :: Quantum Computing",
   "Topic :: Multimedia :: Graphics :: Viewers",
@@ -88,7 +88,7 @@ dev = [
   # Read by the build backend (build.py, also listed in [build-system].requires) and by
   # dev_setup.py. The runtime package never imports it, so it is not a project dependency.
   "python-decouple>=3.8,<4",
-  "setuptools>=83.0.0,<84",
+  "setuptools>=84.1.0,<85",
   "types-setuptools>=83.0.0,<84",
 ]
 release = [
