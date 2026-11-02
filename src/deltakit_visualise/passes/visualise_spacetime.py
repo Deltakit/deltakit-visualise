@@ -77,12 +77,7 @@ from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers impor
     to_side_visibility,
 )
 from deltakit_visualise.passes.visualise_spacetime_utils.correlation_helpers import (
-    _append_bridge_correlation,
-    _append_first_patch_correlation,
-    _append_last_patch_correlation,
-    _append_middle_patch_correlation,
     append_multi_pauli_correlations,
-    get_multi_pauli_connections,
     make_correlation_data,
     make_side_id,
 )
@@ -896,7 +891,7 @@ def append_correlation_gap_data(
 
     for blocks in groups.values():
         ordered_blocks = sorted(blocks.values(), key=lambda block: block[0]["startHeight"])
-        
+
         # Fill gap from prepared patch to first correlation
         if ordered_blocks:
             first_base, _, first_side, first_correlation = ordered_blocks[0]
@@ -911,7 +906,7 @@ def append_correlation_gap_data(
                     and surf.get("startHeight") == 0
                     and surf.get("op_name") == "log_asm.prepare"
                 ]
-                
+
                 if prepared_patches:
                     prepared_patch = prepared_patches[0]
                     initial_gap_id = make_side_id(prepared_patch["id"], first_base["id"])
@@ -934,7 +929,7 @@ def append_correlation_gap_data(
                         "colour": first_correlation["colour"],
                     }
                     visualisation_data.extend((initial_gap_side, initial_gap_correlation))
-        
+
         # Fill gaps between consecutive correlations
         for previous, following in pairwise(ordered_blocks):
             previous_top = previous[1]
@@ -969,7 +964,6 @@ def append_correlation_gap_data(
             visualisation_data.extend((gap_side, gap_correlation))
 
 
-# Pass implementation
 @dataclass(frozen=True)
 class VisualiseSpacetime(ModulePass):
     """Deltakit-visualise pass that walks the AST and collects visualisation data."""
