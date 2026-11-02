@@ -7,6 +7,7 @@ using the xDSL framework patterns for visualisation purposes.
 import json
 from dataclasses import dataclass
 from functools import singledispatch
+from itertools import pairwise
 from typing import cast
 
 from deltakit_compile.dialects.logical_assembly import (
@@ -23,10 +24,12 @@ from deltakit_compile.dialects.logical_assembly import (
     StepOp,
     SurfaceCodeBasePatch,
 )
+from deltakit_compile.dialects.qcore import PauliAttr
 from deltakit_compile.dialects.qstruct import OutputOp, ParallelOp, YieldOp
+from deltakit_compile.dialects.sobs import DecUnplacedObservableOp, LocateUnplacedObservableOp
 from xdsl.dialects.builtin import FloatAttr as FloatAttr  # noqa: PLC0414
 from xdsl.dialects.builtin import IntAttr, ModuleOp, StringAttr
-from xdsl.ir import Operation
+from xdsl.ir import Operation, SSAValue
 from xdsl.passes import ModulePass
 
 from deltakit_visualise.constants import (
@@ -37,6 +40,8 @@ from deltakit_visualise.constants import (
     VISUALISE_SPACETIME_DATA,
 )
 from deltakit_visualise.types import (
+    CorrelationData,
+    CorrelationDirection,
     RotateColour,
     RotateData,
     SideColour,
@@ -57,7 +62,11 @@ from deltakit_visualise.utils.attributes import (
     get_patch_orientation,
     get_patch_size,
 )
-from deltakit_visualise.utils.patch_geometry import VisibleSides, get_visible_sides
+from deltakit_visualise.utils.patch_geometry import (
+    VisibleSides,
+    get_patch_sides,
+    get_visible_sides,
+)
 
 
 def get_start_height(op: Operation) -> float:
@@ -107,6 +116,344 @@ def to_side_visibility(*visible: VisibleSides) -> SideVisibility:
         "+Y": all(v.top for v in visible),
         "-Y": all(v.bottom for v in visible),
     }
+
+
+# ============================================================================
+# Correlation Surface Visualization Helpers
+# ============================================================================
+
+
+def make_side_id(from_surface_id: str, to_surface_id: str) -> str:
+    """Create a deterministic ID for a side connecting two surfaces."""
+    return f"side_{len(from_surface_id)}:{from_surface_id}:{to_surface_id}"
+
+
+def _get_opposing_sides_map() -> dict[tuple[str, str], tuple[str, str]]:
+    """Return mapping of opposite patch edges (e.g., left-right, top-bottom)."""
+    return {
+        ("left", "right"): ("+X", "-X"),
+        ("right", "left"): ("-X", "+X"),
+        ("top", "bottom"): ("+Y", "-Y"),
+        ("bottom", "top"): ("-Y", "+Y"),
+    }
+
+
+def get_patch_connection_directions(
+    patch: SurfaceCodeBasePatch, other_patch: SurfaceCodeBasePatch
+) -> tuple[str, str] | None:
+    """Return the facing directions when two patches share an edge."""
+    patch_sides = get_patch_sides(patch)
+    other_sides = get_patch_sides(other_patch)
+    
+    for (patch_side, other_side), (patch_dir, other_dir) in _get_opposing_sides_map().items():
+        if getattr(patch_sides, patch_side) == getattr(other_sides, other_side):
+            return patch_dir, other_dir
+    return None
+
+
+def _match_bridge_to_patch_pair(
+    patch: SurfaceCodeBasePatch,
+    next_patch: SurfaceCodeBasePatch,
+    bridge_patches: list[SurfaceCodeBasePatch],
+) -> tuple[int, str, str, str, str] | None:
+    """Find the single bridge connecting two adjacent patches."""
+    for bridge_index, bridge_patch in enumerate(bridge_patches):
+        patch_to_bridge = get_patch_connection_directions(patch, bridge_patch)
+        bridge_to_next = get_patch_connection_directions(bridge_patch, next_patch)
+        
+        if patch_to_bridge is not None and bridge_to_next is not None:
+            return (
+                bridge_index,
+                patch_to_bridge[0],
+                patch_to_bridge[1],
+                bridge_to_next[0],
+                bridge_to_next[1],
+            )
+    return None
+
+
+def get_multi_pauli_connections(
+    logical_patch_types: list[SurfaceCodeBasePatch],
+    bridge_patch_types: list[SurfaceCodeBasePatch],
+) -> list[tuple[int, str, str, str, str]]:
+    """Match each adjacent logical-patch pair to its bridge and facing directions.
+    
+    Returns a list of connections where each connection is:
+    (bridge_index, patch_to_bridge_dir, bridge_to_patch_dir, 
+     bridge_to_next_dir, next_to_bridge_dir)
+    """
+    connections: list[tuple[int, str, str, str, str]] = []
+    used_bridge_indices: set[int] = set()
+    
+    for patch, next_patch in pairwise(logical_patch_types):
+        connection = _match_bridge_to_patch_pair(patch, next_patch, bridge_patch_types)
+        
+        if connection is None:
+            msg = "Each adjacent pair of located patches must share exactly one bridge."
+            raise ValueError(msg)
+        
+        bridge_index = connection[0]
+        if bridge_index in used_bridge_indices:
+            msg = "A bridge cannot connect more than one adjacent patch pair."
+            raise ValueError(msg)
+        
+        used_bridge_indices.add(bridge_index)
+        connections.append(connection)
+    
+    return connections
+
+
+# ============================================================================
+# Correlation Direction Helpers
+# ============================================================================
+
+
+def _get_bridge_correlation_directions(bridge_direction: str) -> list[CorrelationDirection]:
+    """Get correlation directions for a bridge based on its movement axis.
+    
+    Bridge moving along ±Y: show ±Y vertical
+    Bridge moving along ±X: show ±X horizontal
+    """
+    if bridge_direction in {"+Y", "-Y"}:
+        return [
+            {"orientation": "vertical", "direction": "+Y"},
+            {"orientation": "vertical", "direction": "-Y"},
+        ]
+    # bridge_direction in {"+X", "-X"}
+    return [
+        {"orientation": "horizontal", "direction": "+X"},
+        {"orientation": "horizontal", "direction": "-X"},
+    ]
+
+
+def _get_opposite_direction(direction: str) -> str:
+    """Get opposite direction: +X ↔ -X, +Y ↔ -Y."""
+    return "-X" if direction == "+X" else "+X" if direction == "-X" else direction
+
+
+def _get_patch_correlation_directions(
+    bridge_direction: str | None = None,
+) -> list[CorrelationDirection]:
+    """Get correlation directions for a patch.
+    
+    Patches always show ±Y (natural sides). If bridge_direction is perpendicular
+    (±X), add that direction as well.
+    """
+    directions: list[CorrelationDirection] = [
+        {"orientation": "vertical", "direction": "-Y"},
+        {"orientation": "vertical", "direction": "+Y"},
+    ]
+    
+    if bridge_direction and bridge_direction not in {"+Y", "-Y"}:
+        directions.append({
+            "orientation": "horizontal",
+            "direction": bridge_direction,
+        })
+    
+    return directions
+
+
+# ============================================================================
+# Correlation Data Construction
+# ============================================================================
+
+
+def make_correlation_data(
+    block_id: str,
+    directions: list[CorrelationDirection],
+    bases: list[PauliAttr],
+) -> CorrelationData:
+    """Build one correlation item associated with a side."""
+    colour = SurfaceColour.set_colour_scheme(bases[0])
+    return {
+        "type": "correlation",
+        "blockId": block_id,
+        "directions": directions,
+        "colour": colour,
+    }
+
+
+def _append_first_patch_correlation(
+    visualisation_data: list[SpaceTimeVisualisationItem],
+    input_ids: list[str],
+    output_ids: list[str],
+    logical_indices: list[int],
+    bases: list[PauliAttr],
+    bridge_direction: str | None = None,
+) -> None:
+    """Append correlation for the first patch in a multi-Pauli chain."""
+    directions = _get_patch_correlation_directions(bridge_direction)
+    
+    visualisation_data.append(
+        make_correlation_data(
+            make_side_id(input_ids[logical_indices[0]], output_ids[logical_indices[0]]),
+            directions,
+            [bases[0]],
+        )
+    )
+
+
+def _append_middle_patch_correlation(
+    visualisation_data: list[SpaceTimeVisualisationItem],
+    input_ids: list[str],
+    output_ids: list[str],
+    logical_indices: list[int],
+    bases: list[PauliAttr],
+    patch_index: int,
+) -> None:
+    """Append correlation for a middle patch (not first or last)."""
+    visualisation_data.append(
+        make_correlation_data(
+            make_side_id(
+                input_ids[logical_indices[patch_index]],
+                output_ids[logical_indices[patch_index]],
+            ),
+            [
+                {"orientation": "vertical", "direction": "-Y"},
+                {"orientation": "vertical", "direction": "+Y"},
+            ],
+            [bases[patch_index]],
+        )
+    )
+
+
+def _append_last_patch_correlation(
+    visualisation_data: list[SpaceTimeVisualisationItem],
+    input_ids: list[str],
+    output_ids: list[str],
+    logical_indices: list[int],
+    bases: list[PauliAttr],
+    bridge_direction: str | None = None,
+) -> None:
+    """Append correlation for the last patch in a multi-Pauli chain."""
+    directions = _get_patch_correlation_directions(bridge_direction)
+    
+    # For last patch, reverse the bridge direction (if present)
+    if bridge_direction and bridge_direction not in {"+Y", "-Y"}:
+        directions[-1]["direction"] = _get_opposite_direction(bridge_direction)
+    
+    visualisation_data.append(
+        make_correlation_data(
+            make_side_id(
+                input_ids[logical_indices[-1]], output_ids[logical_indices[-1]]
+            ),
+            directions,
+            [bases[-1]],
+        )
+    )
+
+
+def _append_bridge_correlation(
+    visualisation_data: list[SpaceTimeVisualisationItem],
+    connection: tuple[int, str, str, str, str],
+    bridge_input_ids: list[str],
+    bridge_output_ids: list[str],
+    bases: list[PauliAttr],
+    connection_index: int,
+) -> None:
+    """Append correlation for a bridge connecting two patches."""
+    bridge_index, _, bridge_direction_in, _, _ = connection
+    
+    # Get bases for bridge (if available, otherwise use first base)
+    if connection_index + 1 < len(bases):
+        bridge_bases = [bases[connection_index], bases[connection_index + 1]]
+    else:
+        bridge_bases = [bases[connection_index]] if connection_index < len(bases) else []
+    
+    directions = _get_bridge_correlation_directions(bridge_direction_in)
+    
+    visualisation_data.append(
+        make_correlation_data(
+            make_side_id(bridge_input_ids[bridge_index], bridge_output_ids[bridge_index]),
+            directions,
+            bridge_bases,
+        )
+    )
+
+
+def append_multi_pauli_correlations(
+    op: LocateUnplacedObservableOp,
+    multi_pauli_op: MultiPauliMeasOp,
+    logical_patches: list[SSAValue],
+    visualisation_data: list[SpaceTimeVisualisationItem],
+) -> None:
+    """Append correlation items spanning a multi-Pauli patch chain.
+    
+    For a chain of N patches with N-1 bridges:
+    - First patch: ±Y + opposite bridge direction (if perpendicular)
+    - Bridges: directions matching bridge movement axis
+    - Middle patches: ±Y only
+    - Last patch: ±Y + bridge direction (if perpendicular)
+    """
+    # Extract and validate data
+    logical_patch_types = [
+        cast(SurfaceCodeBasePatch, patch.type) for patch in logical_patches
+    ]
+    bridge_patch_types = [
+        cast(SurfaceCodeBasePatch, bridge.type) for bridge in multi_pauli_op.bridge_patches
+    ]
+    connections = get_multi_pauli_connections(logical_patch_types, bridge_patch_types)
+    logical_indices = [multi_pauli_op.res.index(patch) for patch in logical_patches]
+    input_ids = get_in_logical_patch_ids(multi_pauli_op)
+    output_ids = get_out_logical_patch_ids(multi_pauli_op)
+    bridge_input_ids = get_in_bridge_patch_ids(multi_pauli_op)
+    bridge_output_ids = get_out_bridge_patch_ids(multi_pauli_op)
+    bases = list(op.bases.data)
+
+    # Single patch case: no bridges
+    if len(logical_patch_types) == 1:
+        logical_index = logical_indices[0]
+        visualisation_data.append(
+            make_correlation_data(
+                make_side_id(input_ids[logical_index], output_ids[logical_index]),
+                _get_patch_correlation_directions(),
+                [bases[0]],
+            )
+        )
+        return
+
+    # Multi-patch chain: append correlations for first, bridges, middle, and last
+    first_bridge_direction = connections[0][2]
+    _append_first_patch_correlation(
+        visualisation_data,
+        input_ids,
+        output_ids,
+        logical_indices,
+        bases,
+        bridge_direction=_get_opposite_direction(first_bridge_direction),
+    )
+
+    for connection_index, connection in enumerate(connections):
+        _append_bridge_correlation(
+            visualisation_data,
+            connection,
+            bridge_input_ids,
+            bridge_output_ids,
+            bases,
+            connection_index,
+        )
+
+        # Append middle patches (between bridges)
+        patch_index = connection_index + 1
+        if patch_index < len(logical_patch_types) - 1:
+            _append_middle_patch_correlation(
+                visualisation_data,
+                input_ids,
+                output_ids,
+                logical_indices,
+                bases,
+                patch_index,
+            )
+
+    last_bridge_direction = connections[-1][2]
+    _append_last_patch_correlation(
+        visualisation_data,
+        input_ids,
+        output_ids,
+        logical_indices,
+        bases,
+        bridge_direction=last_bridge_direction,
+    )
 
 
 def get_rotate_colour_scheme(
@@ -247,6 +594,7 @@ def handle_measure_stabiliser(
 
     surface_data: SidesData = {
         "type": "side",
+        "id": make_side_id(get_attr_str(op, IN_OP_ID), get_attr_str(op, OUT_OP_ID)),
         "op_name": op.name,
         "colourScheme": colour_scheme,
         "sides": {"+X": True, "-X": True, "+Y": True, "-Y": True},
@@ -340,6 +688,7 @@ def handle_grow_operation(op: GrowOp, visualisation_data: list[SpaceTimeVisualis
             # Create the sides connecting the initial and final surfaces of the grown patch
             {
                 "type": "side",
+                "id": make_side_id(initial_to_patch_id, final_to_patch_id),
                 "op_name": op.name,
                 "colourScheme": SideColour.set_colour_scheme(get_patch_orientation(to_patch)),
                 "sides": {"+X": True, "-X": True, "+Y": True, "-Y": True},
@@ -405,6 +754,7 @@ def handle_shrink_operation(
             # Create the sides connecting the initial and final surfaces of the shrunk patch
             {
                 "type": "side",
+                "id": make_side_id(initial_to_patch_id, final_to_patch_id),
                 "op_name": op.name,
                 "colourScheme": SideColour.set_colour_scheme(get_patch_orientation(to_patch)),
                 "sides": {"+X": True, "-X": True, "+Y": True, "-Y": True},
@@ -532,6 +882,7 @@ def append_rotate_bridge_data(
             },
             {
                 "type": "side",
+                "id": make_side_id(bridge_start_id, bridge_mid_id),
                 "op_name": op.name,
                 "colourScheme": SideColour.set_colour_scheme(from_orientation),
                 "sides": bridge_sides,
@@ -624,6 +975,7 @@ def handle_rotate_operation(
     # Add a sides element for the rotate operation for initial patch
     rotate_side_from: SidesData = {
         "type": "side",
+        "id": make_side_id(from_start_id, from_mid_id),
         "op_name": op.name,
         "colourScheme": SideColour.set_colour_scheme(from_orientation),
         "sides": from_sides,
@@ -701,6 +1053,7 @@ def handle_rotate_operation(
     # Add sides for the rotate operation for the target patch connecting the mid and top surfaces
     rotate_side_to: SidesData = {
         "type": "side",
+        "id": make_side_id(to_mid_id, to_top_id),
         "op_name": op.name,
         "colourScheme": SideColour.set_colour_scheme(to_orientation),
         "sides": to_sides,
@@ -713,6 +1066,86 @@ def handle_rotate_operation(
     visualisation_data.append(rotate_surface_to_top)
     visualisation_data.append(rotate_side_to)
     visualisation_data.append(rotate_to)
+
+
+@handle_operation.register
+def handle_dec_unplaced_observable(
+    op: DecUnplacedObservableOp, visualisation_data: list[SpaceTimeVisualisationItem]
+) -> None:
+    """Handle DecUnplacedObservableOp for visualisation."""
+
+
+@handle_operation.register
+def handle_locate_unplaced_opbservable(
+    op: LocateUnplacedObservableOp, visualisation_data: list[SpaceTimeVisualisationItem]
+) -> None:
+    """Handle LocateUnplacedObservableOp for visualisation."""
+    resolved_patches = []
+    patch_owners = []
+    for patch in op.patches:
+        resolved_patch = patch
+        patch_owner = patch.owner
+        if isinstance(patch_owner, ParallelOp):
+            resolved_patch = patch_owner.result_to_yield_arg(patch)
+            patch_owner = resolved_patch.owner
+        resolved_patches.append(resolved_patch)
+        patch_owners.append(patch_owner)
+
+    if (
+        patch_owners
+        and isinstance(patch_owners[0], MultiPauliMeasOp)
+        and all(patch_owner is patch_owners[0] for patch_owner in patch_owners)
+    ):
+        multi_pauli_op = patch_owners[0]
+        append_multi_pauli_correlations(
+            op, multi_pauli_op, resolved_patches, visualisation_data
+        )
+        return
+
+    for patch, basis in zip(resolved_patches, op.bases.data, strict=True):
+        patch_owner = patch.owner
+
+        if isinstance(patch_owner, MultiPauliMeasOp):
+            patch_index = patch_owner.res.index(patch)
+            side_id = make_side_id(
+                get_in_logical_patch_ids(patch_owner)[patch_index],
+                get_out_logical_patch_ids(patch_owner)[patch_index],
+            )
+        elif isinstance(patch_owner, MeasStabOp):
+            side_id = make_side_id(
+                get_attr_str(patch_owner, IN_OP_ID),
+                get_attr_str(patch_owner, OUT_OP_ID),
+            )
+        elif isinstance(patch_owner, PrepareOp):
+            next_measurement = next(
+                (
+                    use.operation
+                    for use in patch.uses
+                    if isinstance(use.operation, MeasStabOp)
+                ),
+                None,
+            )
+            if next_measurement is None:
+                msg = "A prepared-patch correlation requires a following stabiliser measurement."
+                raise ValueError(msg)
+            side_id = make_side_id(
+                get_attr_str(next_measurement, IN_OP_ID),
+                get_attr_str(next_measurement, OUT_OP_ID),
+            )
+        else:
+            msg = f"No side is available for correlation on {patch_owner.name}."
+            raise ValueError(msg)
+
+        visualisation_data.append(
+            make_correlation_data(
+                side_id,
+                [
+                    {"orientation": "vertical", "direction": "-Y"},
+                    {"orientation": "vertical", "direction": "+Y"},
+                ],
+                [basis],
+            )
+        )
 
 
 @handle_operation.register
@@ -755,6 +1188,7 @@ def handle_multi_pauli_measurement(
         }
         logical_sides_result: SidesData = {
             "type": "side",
+            "id": make_side_id(in_logical_patch_id, out_logical_patch_id),
             "op_name": op.name,
             "colourScheme": SideColour.set_colour_scheme(orientation),
             "sides": {
@@ -806,6 +1240,7 @@ def handle_multi_pauli_measurement(
         # Add sides
         bridge_sides_result: SidesData = {
             "type": "side",
+            "id": make_side_id(in_bridge_patch_id, out_bridge_patch_id),
             "op_name": op.name,
             "colourScheme": SideColour.set_colour_scheme(orientation),
             "sides": {
@@ -842,6 +1277,62 @@ def handle_module_operation(
     # so we can choose to ignore it or handle it as needed.
 
 
+def append_correlation_gap_data(
+    visualisation_data: list[SpaceTimeVisualisationItem],
+) -> None:
+    """Continue vertically connected correlations across gaps at the same footprint."""
+    surfaces = {item["id"]: item for item in visualisation_data if item["type"] == "surface"}
+    sides = {item["id"]: item for item in visualisation_data if item["type"] == "side"}
+    groups: dict[
+        tuple[tuple[float, float], tuple[int, int], SurfaceColour],
+        dict[str, tuple[SurfaceData, SurfaceData, SidesData, CorrelationData]],
+    ] = {}
+    for item in visualisation_data:
+        if item["type"] != "correlation":
+            continue
+        side = sides[item["blockId"]]
+        base = surfaces[side["fromSurfaceId"]]
+        top = surfaces[side["toSurfaceId"]]
+        if base["location"] != top["location"] or base["size"] != top["size"]:
+            continue
+        key = (base["location"], base["size"], item["colour"])
+        groups.setdefault(key, {})[side["id"]] = (base, top, side, item)
+
+    for blocks in groups.values():
+        ordered_blocks = sorted(blocks.values(), key=lambda block: block[0]["startHeight"])
+        for previous, following in pairwise(ordered_blocks):
+            previous_top = previous[1]
+            following_base, _, following_side, following_correlation = following
+            if previous_top["startHeight"] >= following_base["startHeight"]:
+                continue
+            if {"orientation": "vertical", "direction": "+Y"} not in previous[3]["directions"]:
+                continue
+            if {"orientation": "vertical", "direction": "-Y"} not in following_correlation[
+                "directions"
+            ]:
+                continue
+            gap_id = make_side_id(previous_top["id"], following_base["id"])
+            gap_side: SidesData = {
+                "type": "side",
+                "id": gap_id,
+                "op_name": "correlation_gap",
+                "colourScheme": following_side["colourScheme"],
+                "sides": {"+X": False, "-X": False, "+Y": False, "-Y": False},
+                "fromSurfaceId": previous_top["id"],
+                "toSurfaceId": following_base["id"],
+            }
+            gap_correlation: CorrelationData = {
+                "type": "correlation",
+                "blockId": gap_id,
+                "directions": [
+                    {"orientation": "vertical", "direction": "-Y"},
+                    {"orientation": "vertical", "direction": "+Y"},
+                ],
+                "colour": following_correlation["colour"],
+            }
+            visualisation_data.extend((gap_side, gap_correlation))
+
+
 # Pass implementation
 @dataclass(frozen=True)
 class VisualiseSpacetime(ModulePass):
@@ -855,5 +1346,6 @@ class VisualiseSpacetime(ModulePass):
 
         for child in op.walk():
             handle_operation(child, visualisation_data)
+        append_correlation_gap_data(visualisation_data)
         # Store the visualisation_data on the module for later retrieval
         op.attributes[VISUALISE_SPACETIME_DATA] = StringAttr(json.dumps(visualisation_data))

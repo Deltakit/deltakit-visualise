@@ -169,6 +169,7 @@ class SidesData(TypedDict):
 
     Attributes:
         type: Literal discriminator indicating this is a side item.
+        id: Unique identifier for this side.
         op_name: Name of the operation being visualised.
         colourScheme: A pair of colourScheme for the two sides.
         sides: Flags to show or hide sides, in the order (X, -X, Y, -Y).
@@ -177,6 +178,7 @@ class SidesData(TypedDict):
     """
 
     type: Literal["side"]
+    id: str
     op_name: str
     colourScheme: tuple[SideColour, SideColour]
     sides: SideVisibility
@@ -215,8 +217,33 @@ class RotateData(TypedDict):
     toSurfaceId: str
 
 
+class CorrelationDirection(TypedDict):
+    """Orientation and signed direction of a correlation surface entry."""
+
+    orientation: Literal["horizontal", "vertical"]
+    direction: str
+
+
+class CorrelationData(TypedDict):
+    """Correlation surface visualisation data item.
+
+    Attributes:
+        type: Literal discriminator indicating this is a correlation item.
+        blockId: Identifier of the side that creates this correlation.
+        directions: Orientation and direction of each correlation surface entry.
+        colour: The colour to render the correlation surface.
+    """
+
+    type: Literal["correlation"]
+    blockId: str
+    directions: list[CorrelationDirection]
+    colour: Literal[SurfaceColour.BLUE, SurfaceColour.RED]
+
+
 # Union type for the 3D spacetime visualisation items
-SpaceTimeVisualisationItem = SurfaceData | SidesData | ResizeData | StepData | RotateData
+SpaceTimeVisualisationItem = (
+    SurfaceData | SidesData | ResizeData | StepData | RotateData | CorrelationData
+)
 
 
 class PlaquetteData(TypedDict):
