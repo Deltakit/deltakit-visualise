@@ -228,7 +228,15 @@ def _get_bridge_correlation_directions(bridge_direction: str) -> list[Correlatio
 
 def _get_opposite_direction(direction: str) -> str:
     """Get opposite direction: +X ↔ -X, +Y ↔ -Y."""
-    return "-X" if direction == "+X" else "+X" if direction == "-X" else direction
+    if direction == "+X":
+        return "-X"
+    if direction == "-X":
+        return "+X"
+    if direction == "+Y":
+        return "-Y"
+    if direction == "-Y":
+        return "+Y"
+    return direction
 
 
 def _get_patch_correlation_directions(
