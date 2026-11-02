@@ -446,7 +446,7 @@ def append_multi_pauli_correlations(
                 patch_index,
             )
 
-    last_bridge_direction = connections[-1][2]
+    last_bridge_direction = connections[-1][3]
     _append_last_patch_correlation(
         visualisation_data,
         input_ids,
@@ -1299,6 +1299,46 @@ def append_correlation_gap_data(
 
     for blocks in groups.values():
         ordered_blocks = sorted(blocks.values(), key=lambda block: block[0]["startHeight"])
+        
+        # Fill gap from prepared patch to first correlation
+        if ordered_blocks:
+            first_base, _, first_side, first_correlation = ordered_blocks[0]
+            if first_base["startHeight"] > 0:
+                # Find prepared patch at this location with height 0
+                location = first_base["location"]
+                size = first_base["size"]
+                prepared_patches = [
+                    surf for surf in surfaces.values()
+                    if surf.get("location") == location 
+                    and surf.get("size") == size
+                    and surf.get("startHeight") == 0
+                    and surf.get("op_name") == "log_asm.prepare"
+                ]
+                
+                if prepared_patches:
+                    prepared_patch = prepared_patches[0]
+                    initial_gap_id = make_side_id(prepared_patch["id"], first_base["id"])
+                    initial_gap_side: SidesData = {
+                        "type": "side",
+                        "id": initial_gap_id,
+                        "op_name": "correlation_gap",
+                        "colourScheme": first_side["colourScheme"],
+                        "sides": {"+X": False, "-X": False, "+Y": False, "-Y": False},
+                        "fromSurfaceId": prepared_patch["id"],
+                        "toSurfaceId": first_base["id"],
+                    }
+                    initial_gap_correlation: CorrelationData = {
+                        "type": "correlation",
+                        "blockId": initial_gap_id,
+                        "directions": [
+                            {"orientation": "vertical", "direction": "-Y"},
+                            {"orientation": "vertical", "direction": "+Y"},
+                        ],
+                        "colour": first_correlation["colour"],
+                    }
+                    visualisation_data.extend((initial_gap_side, initial_gap_correlation))
+        
+        # Fill gaps between consecutive correlations
         for previous, following in pairwise(ordered_blocks):
             previous_top = previous[1]
             following_base, _, following_side, following_correlation = following
