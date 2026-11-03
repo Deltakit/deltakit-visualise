@@ -14,6 +14,7 @@ from deltakit_compile.dialects.logical_assembly import (
     GrowOp,
     MeasStabOp,
     MeasureOp,
+    MoveOp,
     MultiPauliMeasOp,
     PatchDeclarationOp,
     PrepareOp,
@@ -29,6 +30,7 @@ from deltakit_visualise.constants import (
     IN_BRIDGE_PATCHES_ID,
     IN_LOGICAL_PATCHES_ID,
     IN_OP_ID,
+    MOVE_BRIDGE_PATCHES_ID,
     OUT_BRIDGE_PATCHES_ID,
     OUT_LOGICAL_PATCHES_ID,
     OUT_OP_ID,
@@ -130,6 +132,17 @@ def handle_rotate_id(op: RotateOp, tracker: IdTracker) -> None:
 
     out_id = tracker.assign(op.res)
     op.attributes[OUT_OP_ID] = StringAttr(out_id)
+
+
+@assign_id.register
+def handle_move_id(op: MoveOp, tracker: IdTracker) -> None:
+    """Assign IDs to the moving patch and its bridge path."""
+    op.attributes[IN_OP_ID] = StringAttr(tracker.next_id())
+    op.attributes[OUT_OP_ID] = StringAttr(tracker.assign(op.res))
+    bridge_ids = [tracker.get_or_assign(bridge) for bridge in op.bridge_patches]
+    op.attributes[MOVE_BRIDGE_PATCHES_ID] = ArrayAttr(
+        [StringAttr(bridge_id) for bridge_id in bridge_ids]
+    )
 
 
 @assign_id.register
