@@ -147,13 +147,27 @@ def _append_last_patch_correlation(
     logical_indices: list[int],
     bases: list[PauliAttr],
     bridge_direction: str | None = None,
+    last_patch: SSAValue | None = None,
 ) -> None:
-    """Append correlation for the last patch in a multi-Pauli chain."""
+    """Append correlation for the last patch in a multi-Pauli chain.
+    
+    The bridge_direction parameter is the direction the last patch already faces
+    towards the bridge (from the connection tuple's [4] element).
+    
+    If the bridge_direction is horizontal (±X) and the last patch has no subsequent
+    operations, exclude the +Y direction from the correlation.
+    """
     directions = _get_patch_correlation_directions(bridge_direction)
-
-    # For last patch, reverse the bridge direction (if present)
-    if bridge_direction and bridge_direction not in {"+Y", "-Y"}:
-        directions[-1]["direction"] = _get_opposite_direction(bridge_direction)
+    
+    # If correlation is purely horizontal (±X) and last patch has no further operations,
+    # remove +Y to avoid unnecessary vertical correlation
+    if (
+        last_patch is not None
+        and bridge_direction in {"+X", "-X"}
+        and not last_patch.uses
+    ):
+        # Remove +Y from directions, keeping only -Y and the horizontal direction
+        directions = [d for d in directions if d["direction"] != "+Y"]
 
     visualisation_data.append(
         make_correlation_data(
@@ -204,7 +218,7 @@ def append_multi_pauli_correlations(
     - First patch: ±Y + opposite bridge direction (if perpendicular)
     - Bridges: directions matching bridge movement axis
     - Middle patches: ±Y only
-    - Last patch: ±Y + bridge direction (if perpendicular)
+    - Last patch: ±Y + direction it faces towards bridge
     """
     # Extract and validate data
     logical_patch_types = [cast(SurfaceCodeBasePatch, patch.type) for patch in logical_patches]
@@ -264,12 +278,13 @@ def append_multi_pauli_correlations(
                 patch_index,
             )
 
-    last_bridge_direction = connections[-1][3]
+    last_patch_direction = connections[-1][4]
     _append_last_patch_correlation(
         visualisation_data,
         input_ids,
         output_ids,
         logical_indices,
         bases,
-        bridge_direction=last_bridge_direction,
+        bridge_direction=last_patch_direction,
+        last_patch=logical_patches[-1],
     )

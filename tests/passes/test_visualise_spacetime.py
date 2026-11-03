@@ -926,7 +926,7 @@ class TestCorrelationDirectionHelpers:
 
     def test_get_opposite_direction_plus_x(self):
         """Test that +X flips to -X."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
             _get_opposite_direction,
         )
 
@@ -935,7 +935,7 @@ class TestCorrelationDirectionHelpers:
 
     def test_get_opposite_direction_minus_x(self):
         """Test that -X flips to +X."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
             _get_opposite_direction,
         )
 
@@ -944,7 +944,7 @@ class TestCorrelationDirectionHelpers:
 
     def test_get_opposite_direction_plus_y(self):
         """Test that +Y flips to -Y."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
             _get_opposite_direction,
         )
 
@@ -953,7 +953,7 @@ class TestCorrelationDirectionHelpers:
 
     def test_get_opposite_direction_minus_y(self):
         """Test that -Y flips to +Y."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
             _get_opposite_direction,
         )
 
@@ -962,7 +962,7 @@ class TestCorrelationDirectionHelpers:
 
     def test_get_bridge_correlation_directions_y_axis(self):
         """Test that Y-axis bridge returns vertical ±Y directions."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
             _get_bridge_correlation_directions,
         )
 
@@ -978,7 +978,7 @@ class TestCorrelationDirectionHelpers:
 
     def test_get_bridge_correlation_directions_x_axis(self):
         """Test that X-axis bridge returns horizontal ±X directions."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
             _get_bridge_correlation_directions,
         )
 
@@ -994,7 +994,7 @@ class TestCorrelationDirectionHelpers:
 
     def test_get_patch_correlation_directions_no_bridge(self):
         """Test that patch without bridge returns only ±Y directions."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
             _get_patch_correlation_directions,
         )
 
@@ -1005,7 +1005,7 @@ class TestCorrelationDirectionHelpers:
 
     def test_get_patch_correlation_directions_with_x_bridge(self):
         """Test that patch with X-axis bridge adds ±X directions."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
             _get_patch_correlation_directions,
         )
 
@@ -1023,7 +1023,7 @@ class TestCorrelationDirectionHelpers:
 
     def test_get_patch_correlation_directions_with_y_bridge(self):
         """Test that patch with Y-axis bridge returns only ±Y (no additional)."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
             _get_patch_correlation_directions,
         )
 
@@ -1057,7 +1057,7 @@ class TestCorrelationSurfaceHelpers:
 
     def test_get_patch_connection_directions_aligned_patches(self):
         """Test finding shared edges between aligned patches."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
             get_patch_connection_directions,
         )
 
@@ -1076,7 +1076,7 @@ class TestCorrelationSurfaceHelpers:
 
     def test_get_patch_connection_directions_no_shared_edge(self):
         """Test that distant patches return None."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
             get_patch_connection_directions,
         )
 
@@ -1092,7 +1092,7 @@ class TestCorrelationSurfaceHelpers:
 
     def test_make_correlation_data_returns_correct_structure(self):
         """Test that make_correlation_data creates valid structure."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.correlation_helpers import (
             make_correlation_data,
         )
 
@@ -1111,7 +1111,7 @@ class TestCorrelationSurfaceHelpers:
 
     def test_make_correlation_data_red_for_x_basis(self):
         """Test that make_correlation_data returns RED for X basis."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.correlation_helpers import (
             make_correlation_data,
         )
 
@@ -1131,7 +1131,7 @@ class TestMultiPauliCorrelationSurfaces:
 
     def test_get_patch_connection_directions_with_patches(self):
         """Test get_patch_connection_directions returns tuple or None."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
             get_patch_connection_directions,
         )
 
@@ -1151,7 +1151,7 @@ class TestMultiPauliCorrelationSurfaces:
 
     def test_get_bridge_correlation_directions_plus_y(self):
         """Test bridge directions generation for +Y."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
             _get_bridge_correlation_directions,
         )
 
@@ -1168,7 +1168,7 @@ class TestMultiPauliCorrelationSurfaces:
 
     def test_get_bridge_correlation_directions_plus_x(self):
         """Test bridge directions generation for +X."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
             _get_bridge_correlation_directions,
         )
 
@@ -1181,7 +1181,7 @@ class TestMultiPauliCorrelationSurfaces:
 
     def test_get_patch_correlation_directions_no_bridge(self):
         """Test _get_patch_correlation_directions with no bridge."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
             _get_patch_correlation_directions,
         )
 
@@ -1199,7 +1199,7 @@ class TestMultiPauliCorrelationSurfaces:
 
     def test_get_patch_correlation_directions_with_x_bridge(self):
         """Test _get_patch_correlation_directions with X-axis bridge."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
             _get_patch_correlation_directions,
         )
 
@@ -1215,7 +1215,7 @@ class TestMultiPauliCorrelationSurfaces:
 
     def test_get_patch_correlation_directions_with_y_bridge(self):
         """Test _get_patch_correlation_directions with Y-axis bridge (no extra)."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
             _get_patch_correlation_directions,
         )
 
@@ -1227,7 +1227,7 @@ class TestMultiPauliCorrelationSurfaces:
 
     def test_make_correlation_data_z_basis_blue(self):
         """Test correlation data with Z basis returns BLUE colour."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.correlation_helpers import (
             make_correlation_data,
         )
 
@@ -1243,7 +1243,7 @@ class TestMultiPauliCorrelationSurfaces:
 
     def test_make_correlation_data_x_basis_red(self):
         """Test correlation data with X basis returns RED colour."""
-        from deltakit_visualise.passes.visualise_spacetime import (
+        from deltakit_visualise.passes.visualise_spacetime_utils.correlation_helpers import (
             make_correlation_data,
         )
 

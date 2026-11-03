@@ -36,12 +36,16 @@ def get_patch_connection_directions(
 
 
 def _get_opposing_sides_map() -> dict[tuple[str, str], tuple[str, str]]:
-    """Return mapping of opposite patch edges (e.g., left-right, top-bottom)."""
+    """Return mapping of opposite patch edges (e.g., left-right, top-bottom).
+    
+    Each tuple maps: when patch.side == other.side, the directions are:
+    (direction patch faces towards other, direction other faces towards patch)
+    """
     return {
-        ("left", "right"): ("+X", "-X"),
-        ("right", "left"): ("-X", "+X"),
-        ("top", "bottom"): ("+Y", "-Y"),
-        ("bottom", "top"): ("-Y", "+Y"),
+        ("left", "right"): ("-X", "+X"),   # patch's left touches other's right: patch faces -X (left), other faces +X (right)
+        ("right", "left"): ("+X", "-X"),   # patch's right touches other's left: patch faces +X (right), other faces -X (left)
+        ("top", "bottom"): ("+Y", "-Y"),   # patch's top touches other's bottom: patch faces +Y (up), other faces -Y (down)
+        ("bottom", "top"): ("-Y", "+Y"),   # patch's bottom touches other's top: patch faces -Y (down), other faces +Y (up)
     }
 
 

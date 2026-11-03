@@ -69,10 +69,6 @@ from deltakit_visualise.passes.visualise_spacetime_utils.height_helpers import (
     get_start_height,
 )
 from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
-    _get_bridge_correlation_directions,
-    _get_opposite_direction,
-    _get_patch_correlation_directions,
-    get_patch_connection_directions,
     get_rotation_direction,
     to_side_visibility,
 )
