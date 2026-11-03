@@ -165,6 +165,7 @@ def handle_move_height(op: MoveOp, tracker: HeightTracker) -> None:
     op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
     op.attributes[END_HEIGHT_ATTR] = FloatAttr(end, Float64Type())
 
+    # Update the start and end heights for any bridge patches associated with the move operation
     for bridge in op.bridge_patches:
         bridge_value: SSAValue = bridge
         while isinstance(bridge_value, OpResult) and isinstance(bridge_value.op, ParallelOp):
