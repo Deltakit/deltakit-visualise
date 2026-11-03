@@ -278,6 +278,7 @@ def handle_measure_operation(
     patch_type = cast(SurfaceCodeBasePatch, op.patch.type)
     location = get_patch_location(patch_type)
     size = get_patch_size(patch_type)
+    # Determine the surface colour based on the patch orientation for movement operation
     surface_colour = SurfaceColour.set_colour_scheme(op.basis)
     for use in op.patch.uses:
         move = use.operation
@@ -482,6 +483,7 @@ def handle_step_operation(op: StepOp, visualisation_data: list[SpaceTimeVisualis
 @handle_operation.register
 def handle_move_operation(op: MoveOp, visualisation_data: list[SpaceTimeVisualisationItem]) -> None:
     """Handle the visualisation of a move operation."""
+    # Extract basic patch information and visualisation parameters
     from_patch = cast(SurfaceCodeBasePatch, op.patch.type)
     to_patch = cast(SurfaceCodeBasePatch, op.res.type)
     from_location = get_patch_location(from_patch)
@@ -506,6 +508,7 @@ def handle_move_operation(op: MoveOp, visualisation_data: list[SpaceTimeVisualis
         [from_patch, to_patch], bridge_patch_types
     )
 
+    # Surfaces and sides for the patch initial location
     from_surface_start: SurfaceData = {
         "type": "surface",
         "id": from_surface_start_id,
@@ -539,6 +542,7 @@ def handle_move_operation(op: MoveOp, visualisation_data: list[SpaceTimeVisualis
     for bridge, bridge_patch, bridge_id, bridge_visible_side in zip(
         op.bridge_patches, bridge_patch_types, bridge_ids, bridge_visible_sides, strict=True
     ):
+        # Add surfaces and sides for each bridge present for the patch
         start_surface_id, end_surface_id = get_move_bridge_surface_ids(op, bridge)
         append_move_bridge_data(
             op,
@@ -551,6 +555,7 @@ def handle_move_operation(op: MoveOp, visualisation_data: list[SpaceTimeVisualis
             end_surface_id=end_surface_id,
         )
 
+    # Surfaces and sides for the patch final location
     to_surface_start: SurfaceData = {
         "type": "surface",
         "id": to_surface_start_id,
@@ -593,6 +598,7 @@ def get_move_bridge_surface_ids(op: MoveOp, bridge: SSAValue) -> tuple[str | Non
         ),
         None,
     )
+    # Traverse through parallel operations to find the actual bridge SSAValue if needed
     while isinstance(bridge, OpResult) and isinstance(bridge.op, ParallelOp):
         yielded_values: list[SSAValue] = []
         for region in bridge.op.par_regions:
