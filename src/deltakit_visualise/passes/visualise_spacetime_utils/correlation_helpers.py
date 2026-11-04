@@ -103,9 +103,17 @@ def _append_first_patch_correlation(
     logical_indices: list[int],
     bases: list[PauliAttr],
     bridge_direction: str | None = None,
+    is_purely_horizontal: bool = False,
 ) -> None:
-    """Append correlation for the first patch in a multi-Pauli chain."""
+    """Append correlation for the first patch in a multi-Pauli chain.
+    
+    If the correlation is purely horizontal, remove +Y to avoid unnecessary vertical surfaces.
+    """
     directions = _get_patch_correlation_directions(bridge_direction)
+    
+    # If correlation is purely horizontal (±X only), remove +Y
+    if is_purely_horizontal:
+        directions = [d for d in directions if d["direction"] != "+Y"]
 
     visualisation_data.append(
         make_correlation_data(
@@ -148,25 +156,27 @@ def _append_last_patch_correlation(
     bases: list[PauliAttr],
     bridge_direction: str | None = None,
     last_patch: SSAValue | None = None,
+    is_purely_horizontal: bool = False,
 ) -> None:
     """Append correlation for the last patch in a multi-Pauli chain.
     
     The bridge_direction parameter is the direction the last patch already faces
     towards the bridge (from the connection tuple's [4] element).
     
-    If the bridge_direction is horizontal (±X) and the last patch has no subsequent
-    operations, exclude the +Y direction from the correlation.
+    If correlation is purely horizontal (±X only), or if bridge_direction is horizontal
+    (±X) and the last patch has no subsequent operations, exclude the +Y direction.
     """
     directions = _get_patch_correlation_directions(bridge_direction)
     
-    # If correlation is purely horizontal (±X) and last patch has no further operations,
-    # remove +Y to avoid unnecessary vertical correlation
-    if (
-        last_patch is not None
-        and bridge_direction in {"+X", "-X"}
+    # Remove +Y if:
+    # 1. Correlation is purely horizontal (all bridges are ±X), OR
+    # 2. Bridge is horizontal (±X) AND last patch has no further operations
+    if is_purely_horizontal or (
+        bridge_direction in {"+X", "-X"}
+        and last_patch is not None
         and not last_patch.uses
     ):
-        # Remove +Y from directions, keeping only -Y and the horizontal direction
+        # Remove +Y from directions, keeping -Y and the horizontal direction
         directions = [d for d in directions if d["direction"] != "+Y"]
 
     visualisation_data.append(
@@ -219,6 +229,9 @@ def append_multi_pauli_correlations(
     - Bridges: directions matching bridge movement axis
     - Middle patches: ±Y only
     - Last patch: ±Y + direction it faces towards bridge
+    
+    Special case: If the correlation is purely horizontal (all bridge directions are ±X),
+    remove +Y from all patches to avoid unnecessary vertical correlation surfaces.
     """
     # Extract and validate data
     logical_patch_types = [cast(SurfaceCodeBasePatch, patch.type) for patch in logical_patches]
@@ -232,6 +245,12 @@ def append_multi_pauli_correlations(
     bridge_input_ids = get_in_bridge_patch_ids(multi_pauli_op)
     bridge_output_ids = get_out_bridge_patch_ids(multi_pauli_op)
     bases = list(op.bases.data)
+
+    # Check if correlation is purely horizontal (all bridge directions are ±X)
+    is_purely_horizontal = all(
+        connection[2] in {"+X", "-X"} and connection[3] in {"+X", "-X"}
+        for connection in connections
+    )
 
     # Single patch case: no bridges
     if len(logical_patch_types) == 1:
@@ -254,6 +273,7 @@ def append_multi_pauli_correlations(
         logical_indices,
         bases,
         bridge_direction=_get_opposite_direction(first_bridge_direction),
+        is_purely_horizontal=is_purely_horizontal,
     )
 
     for connection_index, connection in enumerate(connections):
@@ -287,4 +307,5 @@ def append_multi_pauli_correlations(
         bases,
         bridge_direction=last_patch_direction,
         last_patch=logical_patches[-1],
+        is_purely_horizontal=is_purely_horizontal,
     )
