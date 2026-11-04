@@ -217,26 +217,20 @@ class RotateData(TypedDict):
     toSurfaceId: str
 
 
-class CorrelationDirection(TypedDict):
-    """Orientation and signed direction of a correlation surface entry."""
-
-    orientation: Literal["horizontal", "vertical"]
-    direction: str
-
-
 class CorrelationData(TypedDict):
     """Correlation surface visualisation data item.
 
     Attributes:
         type: Literal discriminator indicating this is a correlation item.
         blockId: Identifier of the side that creates this correlation.
-        directions: Orientation and direction of each correlation surface entry.
+        surfaces: List of correlation surface descriptions in format "X+Y", "Y-X", etc.
+                 First axis spans completely (-axis to +axis), second part is partial extent.
         colour: The colour to render the correlation surface.
     """
 
     type: Literal["correlation"]
     blockId: str
-    directions: list[CorrelationDirection]
+    surfaces: list[str]
     colour: Literal[SurfaceColour.BLUE, SurfaceColour.RED]
 
 

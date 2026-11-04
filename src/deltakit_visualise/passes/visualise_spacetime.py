@@ -726,10 +726,7 @@ def handle_locate_unplaced_opbservable(
         visualisation_data.append(
             make_correlation_data(
                 side_id,
-                [
-                    {"orientation": "vertical", "direction": "-Y"},
-                    {"orientation": "vertical", "direction": "+Y"},
-                ],
+                ["X-Z", "X+Z"],
                 [basis],
             )
         )
@@ -918,10 +915,7 @@ def append_correlation_gap_data(
                     initial_gap_correlation: CorrelationData = {
                         "type": "correlation",
                         "blockId": initial_gap_id,
-                        "directions": [
-                            {"orientation": "vertical", "direction": "-Y"},
-                            {"orientation": "vertical", "direction": "+Y"},
-                        ],
+                        "surfaces": ["X-Z", "X+Z"],
                         "colour": first_correlation["colour"],
                     }
                     visualisation_data.extend((initial_gap_side, initial_gap_correlation))
@@ -932,12 +926,11 @@ def append_correlation_gap_data(
             following_base, _, following_side, following_correlation = following
             if previous_top["startHeight"] >= following_base["startHeight"]:
                 continue
-            if {"orientation": "vertical", "direction": "+Y"} not in previous[3]["directions"]:
+            # Check if previous correlation has vertical surfaces
+            if "X+Z" not in previous[3]["surfaces"]:
                 continue
-            if {"orientation": "vertical", "direction": "-Y"} not in following_correlation[
-                "directions"
-            ]:
-                continue
+            # Create gap correlation - use vertical surfaces for continuity
+            # even if the following correlation is purely horizontal
             gap_id = make_side_id(previous_top["id"], following_base["id"])
             gap_side: SidesData = {
                 "type": "side",
@@ -951,10 +944,7 @@ def append_correlation_gap_data(
             gap_correlation: CorrelationData = {
                 "type": "correlation",
                 "blockId": gap_id,
-                "directions": [
-                    {"orientation": "vertical", "direction": "-Y"},
-                    {"orientation": "vertical", "direction": "+Y"},
-                ],
+                "surfaces": ["X-Z", "X+Z"],
                 "colour": following_correlation["colour"],
             }
             visualisation_data.extend((gap_side, gap_correlation))
