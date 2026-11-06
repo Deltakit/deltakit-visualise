@@ -919,3 +919,326 @@ class TestHandleMeasureOperation:
         assert data["size"] == (5, 5)
         assert "id" in data
         assert "startHeight" in data
+
+
+class TestCorrelationDirectionHelpers:
+    """Tests for correlation surface direction helper functions."""
+
+    def test_get_opposite_direction_plus_x(self):
+        """Test that +X flips to -X."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+            _get_opposite_direction,
+        )
+
+        result = _get_opposite_direction("+X")
+        assert result == "-X"
+
+    def test_get_opposite_direction_minus_x(self):
+        """Test that -X flips to +X."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+            _get_opposite_direction,
+        )
+
+        result = _get_opposite_direction("-X")
+        assert result == "+X"
+
+    def test_get_opposite_direction_plus_y(self):
+        """Test that +Y flips to -Y."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+            _get_opposite_direction,
+        )
+
+        result = _get_opposite_direction("+Y")
+        assert result == "-Y"
+
+    def test_get_opposite_direction_minus_y(self):
+        """Test that -Y flips to +Y."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+            _get_opposite_direction,
+        )
+
+        result = _get_opposite_direction("-Y")
+        assert result == "+Y"
+
+    def test_get_bridge_correlation_directions_y_axis(self):
+        """Test that Y-axis bridge (±Y connection, vertical) returns X-based surfaces."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+            _get_bridge_correlation_directions,
+        )
+
+        result = _get_bridge_correlation_directions("+Y")
+        assert len(result) == 2
+        assert result[0] == "X+Y"
+        assert result[1] == "X-Y"
+
+        result = _get_bridge_correlation_directions("-Y")
+        assert len(result) == 2
+        assert result[0] == "X+Y"
+        assert result[1] == "X-Y"
+
+    def test_get_bridge_correlation_directions_x_axis(self):
+        """Test that X-axis bridge (±X connection, horizontal) returns vertical surfaces."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+            _get_bridge_correlation_directions,
+        )
+
+        result = _get_bridge_correlation_directions("+X")
+        assert len(result) == 2
+        assert result[0] == "X+Z"
+        assert result[1] == "X-Z"
+
+        result = _get_bridge_correlation_directions("-X")
+        assert len(result) == 2
+        assert result[0] == "X+Z"
+        assert result[1] == "X-Z"
+
+    def test_get_patch_correlation_directions_no_bridge(self):
+        """Test that patch without bridge returns vertical surfaces spanning X with extent in ±Z."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+            _get_patch_correlation_directions,
+        )
+
+        result = _get_patch_correlation_directions(bridge_direction=None)
+        assert len(result) == 2
+        assert result[0] == "X+Z"
+        assert result[1] == "X-Z"
+
+    def test_get_patch_correlation_directions_with_x_bridge(self):
+        """Test that patch with X-axis (horizontal) bridge returns vertical surfaces."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+            _get_patch_correlation_directions,
+        )
+
+        result = _get_patch_correlation_directions(bridge_direction="+X")
+        assert len(result) == 2
+        assert result[0] == "X+Z"
+        assert result[1] == "X-Z"
+
+        result = _get_patch_correlation_directions(bridge_direction="-X")
+        assert len(result) == 2
+        assert result[0] == "X+Z"
+        assert result[1] == "X-Z"
+
+    def test_get_patch_correlation_directions_with_y_bridge(self):
+        """Test that patch with Y-axis (vertical) bridge returns X-based surfaces."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+            _get_patch_correlation_directions,
+        )
+
+        result = _get_patch_correlation_directions(bridge_direction="+Y")
+        assert len(result) == 2
+        assert result[0] == "X+Y"
+        assert result[1] == "X-Z"
+
+        result = _get_patch_correlation_directions(bridge_direction="-Y")
+        assert len(result) == 2
+        assert result[0] == "X-Y"
+        assert result[1] == "X+Z"
+
+
+class TestCorrelationSurfaceHelpers:
+    """Tests for correlation surface geometry helpers."""
+
+    def test_make_side_id_creates_deterministic_id(self):
+        """Test that make_side_id creates consistent IDs."""
+        from deltakit_visualise.passes.visualise_spacetime import make_side_id
+
+        id1 = make_side_id("patch_A", "patch_B")
+        id2 = make_side_id("patch_A", "patch_B")
+        assert id1 == id2
+        assert "side_" in id1
+        assert "patch_A" in id1
+        assert "patch_B" in id1
+
+    def test_make_side_id_different_for_different_patches(self):
+        """Test that different patches get different IDs."""
+        from deltakit_visualise.passes.visualise_spacetime import make_side_id
+
+        id1 = make_side_id("patch_A", "patch_B")
+        id2 = make_side_id("patch_A", "patch_C")
+        assert id1 != id2
+
+    def test_get_patch_connection_directions_aligned_patches(self):
+        """Test finding shared edges between aligned patches."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+            get_patch_connection_directions,
+        )
+
+        # Two patches with shared left-right edge
+        patch1 = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        patch2 = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([3, 0], OrientationEnum.VERTICAL_Z)
+        )
+
+        result = get_patch_connection_directions(patch1, patch2)
+        assert result is not None
+        # Result is (direction_from_patch1, direction_from_patch2)
+        assert result in [("-X", "+X"), ("+X", "-X")]  # One of these pairs
+
+    def test_get_patch_connection_directions_no_shared_edge(self):
+        """Test that distant patches return None."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+            get_patch_connection_directions,
+        )
+
+        patch1 = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        patch2 = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([10, 10], OrientationEnum.VERTICAL_Z)
+        )
+
+        result = get_patch_connection_directions(patch1, patch2)
+        assert result is None
+
+    def test_make_correlation_data_returns_correct_structure(self):
+        """Test that make_correlation_data creates valid structure with surfaces."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.correlation_helpers import (
+            make_correlation_data,
+        )
+
+        surfaces = ["X-Z", "X+Z"]
+        result = make_correlation_data(
+            "test_side", surfaces, [PauliAttr.Z()]
+        )
+
+        assert result["type"] == "correlation"
+        assert result["blockId"] == "test_side"
+        assert result["surfaces"] == surfaces
+        assert result["colour"] == SurfaceColour.BLUE  # Z basis -> BLUE
+
+    def test_make_correlation_data_red_for_x_basis(self):
+        """Test that make_correlation_data returns RED for X basis."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.correlation_helpers import (
+            make_correlation_data,
+        )
+
+        surfaces = ["Y+X", "Y-X"]
+        result = make_correlation_data(
+            "test_side", surfaces, [PauliAttr.X()]
+        )
+
+        assert result["colour"] == SurfaceColour.RED  # X basis -> RED
+
+
+class TestMultiPauliCorrelationSurfaces:
+    """Tests for multi-pauli measurement correlation surface helper functions."""
+
+    def test_get_patch_connection_directions_with_patches(self):
+        """Test get_patch_connection_directions returns tuple or None."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+            get_patch_connection_directions,
+        )
+
+        patch1 = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        patch2 = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([0, 6], OrientationEnum.VERTICAL_Z)
+        )
+
+        result = get_patch_connection_directions(patch1, patch2)
+        # Should return None or a tuple with two direction strings
+        assert result is None or isinstance(result, tuple)
+        if result is not None:
+            assert len(result) == 2
+            assert all(isinstance(d, str) for d in result)
+
+    def test_get_bridge_correlation_directions_plus_y(self):
+        """Test bridge directions for ±Y connection (vertical, AC measurement)."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+            _get_bridge_correlation_directions,
+        )
+
+        surfaces = _get_bridge_correlation_directions("+Y")
+        assert isinstance(surfaces, list)
+        assert len(surfaces) == 2
+        assert all(isinstance(s, str) for s in surfaces)
+        # Vertical connection (±Y) should return X-based surfaces
+        assert all(s.startswith("X") for s in surfaces)
+        assert "X+Y" in surfaces
+        assert "X-Y" in surfaces
+
+    def test_get_bridge_correlation_directions_plus_x(self):
+        """Test bridge directions for ±X connection (horizontal, BC measurement)."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+            _get_bridge_correlation_directions,
+        )
+
+        surfaces = _get_bridge_correlation_directions("+X")
+        assert isinstance(surfaces, list)
+        assert len(surfaces) == 2
+        # Horizontal connection (±X) should return vertical surfaces
+        assert all(s.startswith("X") for s in surfaces)
+        assert "X+Z" in surfaces
+        assert "X-Z" in surfaces
+
+    def test_get_patch_correlation_directions_no_bridge(self):
+        """Test _get_patch_correlation_directions with no bridge."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+            _get_patch_correlation_directions,
+        )
+
+        surfaces = _get_patch_correlation_directions(bridge_direction=None)
+        assert isinstance(surfaces, list)
+        assert len(surfaces) == 2
+        assert all(isinstance(s, str) for s in surfaces)
+        # No bridge: vertical surfaces spanning X with extent in ±Z
+        assert all(s.startswith("X") for s in surfaces)
+        assert "X-Z" in surfaces
+        assert "X+Z" in surfaces
+
+    def test_get_patch_correlation_directions_with_x_bridge(self):
+        """Test _get_patch_correlation_directions with X-axis (horizontal) bridge."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+            _get_patch_correlation_directions,
+        )
+
+        # Horizontal connection (±X): patches use vertical surfaces
+        surfaces = _get_patch_correlation_directions(bridge_direction="+X")
+        assert isinstance(surfaces, list)
+        assert len(surfaces) == 2
+        assert all(s.startswith("X") for s in surfaces)
+        assert "X+Z" in surfaces
+        assert "X-Z" in surfaces
+
+    def test_get_patch_correlation_directions_with_y_bridge(self):
+        """Test _get_patch_correlation_directions with Y-axis (vertical) bridge."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+            _get_patch_correlation_directions,
+        )
+
+        # Vertical connection (±Y): patches span X with extent in ±Y and ±Z
+        surfaces = _get_patch_correlation_directions(bridge_direction="+Y")
+        assert isinstance(surfaces, list)
+        assert len(surfaces) == 2
+        assert all(s.startswith("X") for s in surfaces)
+        assert "X+Y" in surfaces
+        assert "X-Z" in surfaces
+
+    def test_make_correlation_data_z_basis_blue(self):
+        """Test correlation data with Z basis returns BLUE colour."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.correlation_helpers import (
+            make_correlation_data,
+        )
+
+        surfaces = ["X-Z", "X+Z"]
+        result = make_correlation_data("test_id", surfaces, [PauliAttr.Z()])
+
+        assert result["type"] == "correlation"
+        assert result["blockId"] == "test_id"
+        assert result["colour"] == SurfaceColour.BLUE
+
+    def test_make_correlation_data_x_basis_red(self):
+        """Test correlation data with X basis returns RED colour."""
+        from deltakit_visualise.passes.visualise_spacetime_utils.correlation_helpers import (
+            make_correlation_data,
+        )
+
+        surfaces = ["Y+X", "Y-X"]
+        result = make_correlation_data("test_id", surfaces, [PauliAttr.X()])
+
+        assert result["type"] == "correlation"
+        assert result["colour"] == SurfaceColour.RED
