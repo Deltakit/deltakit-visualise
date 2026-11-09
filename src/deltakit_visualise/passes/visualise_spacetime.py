@@ -8,14 +8,13 @@ import json
 from dataclasses import dataclass
 from functools import singledispatch
 from itertools import pairwise
-from typing import cast, Literal
+from typing import cast
 
 from deltakit_compile.dialects.logical_assembly import (
     GrowOp,
     MeasStabOp,
     MeasureOp,
     MultiPauliMeasOp,
-    OrientationAttr,
     PatchDeclarationOp,
     PrepareOp,
     RotateOp,
@@ -23,20 +22,34 @@ from deltakit_compile.dialects.logical_assembly import (
     StepOp,
     SurfaceCodeBasePatch,
 )
-from deltakit_compile.dialects.qcore import PauliAttr
 from deltakit_compile.dialects.qstruct import OutputOp, ParallelOp, YieldOp
 from deltakit_compile.dialects.sobs import DecUnplacedObservableOp, LocateUnplacedObservableOp
 from xdsl.dialects.builtin import FloatAttr as FloatAttr  # noqa: PLC0414
-from xdsl.dialects.builtin import IntAttr, ModuleOp, StringAttr
-from xdsl.ir import Operation, SSAValue
+from xdsl.dialects.builtin import ModuleOp, StringAttr
+from xdsl.ir import Operation
 from xdsl.passes import ModulePass
 
 from deltakit_visualise.constants import (
-    END_HEIGHT_ATTR,
     IN_OP_ID,
     OUT_OP_ID,
-    START_HEIGHT_ATTR,
     VISUALISE_SPACETIME_DATA,
+)
+from deltakit_visualise.passes.visualise_spacetime_utils.correlation_helpers import (
+    append_multi_pauli_correlations,
+    make_correlation_data,
+    make_side_id,
+)
+from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+    get_rotation_direction,
+    to_side_visibility,
+)
+from deltakit_visualise.passes.visualise_spacetime_utils.height_helpers import (
+    get_end_height,
+    get_start_height,
+)
+from deltakit_visualise.passes.visualise_spacetime_utils.surface_helpers import (
+    get_rotate_colour_scheme,
+    get_rotate_surface_colours,
 )
 from deltakit_visualise.types import (
     CorrelationData,
@@ -61,25 +74,7 @@ from deltakit_visualise.utils.attributes import (
     get_patch_size,
 )
 from deltakit_visualise.utils.patch_geometry import (
-    get_patch_sides,
     get_visible_sides,
-)
-from deltakit_visualise.passes.visualise_spacetime_utils.height_helpers import (
-    get_end_height,
-    get_start_height,
-)
-from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
-    get_rotation_direction,
-    to_side_visibility,
-)
-from deltakit_visualise.passes.visualise_spacetime_utils.correlation_helpers import (
-    append_multi_pauli_correlations,
-    make_correlation_data,
-    make_side_id,
-)
-from deltakit_visualise.passes.visualise_spacetime_utils.surface_helpers import (
-    get_rotate_colour_scheme,
-    get_rotate_surface_colours,
 )
 
 
@@ -894,7 +889,7 @@ def append_correlation_gap_data(
                 size = first_base["size"]
                 prepared_patches = [
                     surf for surf in surfaces.values()
-                    if surf.get("location") == location 
+                    if surf.get("location") == location
                     and surf.get("size") == size
                     and surf.get("startHeight") == 0
                     and surf.get("op_name") == "log_asm.prepare"

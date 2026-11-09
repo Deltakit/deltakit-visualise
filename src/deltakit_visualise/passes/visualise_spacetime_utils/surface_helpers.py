@@ -1,6 +1,8 @@
+# (c) Copyright Riverlane 2025-2026. All rights reserved.
 """Surface and colour scheme utilities."""
 
 from deltakit_compile.dialects.logical_assembly import OrientationAttr, OrientationEnum
+
 from deltakit_visualise.types import RotateColour, SurfaceColour
 
 

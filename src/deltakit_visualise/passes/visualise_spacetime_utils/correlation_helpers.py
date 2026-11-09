@@ -1,14 +1,15 @@
+# (c) Copyright Riverlane 2025-2026. All rights reserved.
 """Correlation surface helpers for multi-Pauli measurements."""
 
 from itertools import pairwise
-from typing import cast, Literal
+from typing import Literal, cast
 
 from deltakit_compile.dialects.logical_assembly import SurfaceCodeBasePatch
-from deltakit_compile.dialects.sobs import LocateUnplacedObservableOp
 from deltakit_compile.dialects.qcore import PauliAttr
+from deltakit_compile.dialects.sobs import LocateUnplacedObservableOp
 from xdsl.ir import SSAValue
 
-from deltakit_visualise.types import CorrelationData, SurfaceColour, SpaceTimeVisualisationItem
+from deltakit_visualise.types import CorrelationData, SpaceTimeVisualisationItem, SurfaceColour
 from deltakit_visualise.utils.attributes import (
     get_in_bridge_patch_ids,
     get_in_logical_patch_ids,
@@ -81,56 +82,17 @@ def get_multi_pauli_connections(
     return connections
 
 
-def _get_patch_growth_direction(
-    logical_patch_types: list[SurfaceCodeBasePatch],
-) -> str | None:
-    """Determine the primary axis along which patches are growing/stacking.
-    
-    Analyzes patch locations to determine if they're primarily growing in the
-    X (±X direction) or Y (±Y direction) axis.
-    
-    Returns: "+Y", "-Y", "+X", "-X", or None if no clear direction.
-    """
-    if len(logical_patch_types) < 2:
-        return None
-    
-    # Get locations from patches
-    locations = []
-    for patch_type in logical_patch_types:
-        # Extract location from patch type
-        try:
-            locations.append(patch_type.properties.data[0].location)
-        except (AttributeError, IndexError):
-            return None
-    
-    # Determine growth direction
-    first_loc = locations[0]
-    last_loc = locations[-1]
-    
-    x_diff = last_loc[0] - first_loc[0]
-    y_diff = last_loc[1] - first_loc[1]
-    
-    # Check which axis has more change
-    if abs(y_diff) > abs(x_diff):
-        # Growing in Y direction
-        return "+Y" if y_diff > 0 else "-Y"
-    elif abs(x_diff) > abs(y_diff):
-        # Growing in X direction
-        return "+X" if x_diff > 0 else "-X"
-    
-    return None
-
-
 def make_correlation_data(
     block_id: str,
     surfaces: list[str],
     bases: list[PauliAttr],
 ) -> CorrelationData:
     """Build one correlation item associated with a side.
-    
+
     Args:
         block_id: The identifier of the side creating this correlation.
-        surfaces: List of correlation surface descriptions (e.g., "X+Z", "Y-X", where Z is vertical).
+        surfaces: List of correlation surface descriptions (e.g., "X+Z", "Y-X",
+            where Z is vertical).
         bases: List of Pauli bases for colour determination.
     """
     colour = SurfaceColour.set_colour_scheme(bases[0])
@@ -149,16 +111,14 @@ def _append_first_patch_correlation(
     logical_indices: list[int],
     bases: list[PauliAttr],
     bridge_direction: str | None = None,
-    patch_growth_direction: str | None = None,
-    is_purely_horizontal: bool = False,
 ) -> None:
     """Append correlation for the first patch in a multi-Pauli chain.
-    
+
     The patch surfaces are determined by the direction it faces towards the bridge
     and the primary growth direction of the patch chain.
     """
-    surfaces = _get_patch_correlation_directions(bridge_direction, patch_growth_direction)
-    
+    surfaces = _get_patch_correlation_directions(bridge_direction)
+
     visualisation_data.append(
         make_correlation_data(
             make_side_id(input_ids[logical_indices[0]], output_ids[logical_indices[0]]),
@@ -176,15 +136,14 @@ def _append_middle_patch_correlation(
     bases: list[PauliAttr],
     patch_index: int,
     bridge_direction: str | None = None,
-    patch_growth_direction: str | None = None,
 ) -> None:
     """Append correlation for a middle patch (not first or last).
-    
-    Middle patches should show full correlation surfaces based on their connection direction
-    and the patch growth direction.
+
+    Middle patches should show full correlation surfaces based on their connection
+    direction and the patch growth direction.
     """
-    surfaces = _get_patch_correlation_directions(bridge_direction, patch_growth_direction)
-    
+    surfaces = _get_patch_correlation_directions(bridge_direction)
+
     visualisation_data.append(
         make_correlation_data(
             make_side_id(
@@ -204,17 +163,14 @@ def _append_last_patch_correlation(
     logical_indices: list[int],
     bases: list[PauliAttr],
     bridge_direction: str | None = None,
-    patch_growth_direction: str | None = None,
-    last_patch: SSAValue | None = None,
-    is_purely_horizontal: bool = False,
 ) -> None:
     """Append correlation for the last patch in a multi-Pauli chain.
-    
+
     The surfaces are determined by the direction the last patch faces towards the bridge
     and the primary growth direction of the patch chain.
     """
-    surfaces = _get_patch_correlation_directions(bridge_direction, patch_growth_direction)
-    
+    surfaces = _get_patch_correlation_directions(bridge_direction)
+
     visualisation_data.append(
         make_correlation_data(
             make_side_id(input_ids[logical_indices[-1]], output_ids[logical_indices[-1]]),
@@ -231,7 +187,6 @@ def _append_bridge_correlation(
     bridge_output_ids: list[str],
     bases: list[PauliAttr],
     connection_index: int,
-    patch_growth_direction: str | None = None,
 ) -> None:
     """Append correlation for a bridge connecting two patches."""
     bridge_index, _, bridge_direction_in, _, _ = connection
@@ -242,7 +197,7 @@ def _append_bridge_correlation(
     else:
         bridge_bases = [bases[connection_index]] if connection_index < len(bases) else []
 
-    directions = _get_bridge_correlation_directions(bridge_direction_in, patch_growth_direction)
+    directions = _get_bridge_correlation_directions(bridge_direction_in)
 
     visualisation_data.append(
         make_correlation_data(
@@ -266,7 +221,7 @@ def append_multi_pauli_correlations(
     - Bridges: surfaces based on patch growth direction
     - Middle patches: surfaces based on growth direction
     - Last patch: surfaces based on growth direction and bridge connection
-    
+
     The growth direction is determined by analyzing patch positions.
     """
     # Extract and validate data
@@ -281,15 +236,6 @@ def append_multi_pauli_correlations(
     bridge_input_ids = get_in_bridge_patch_ids(multi_pauli_op)
     bridge_output_ids = get_out_bridge_patch_ids(multi_pauli_op)
     bases = list(op.bases.data)
-    
-    # Determine primary growth direction of the patch chain
-    patch_growth_direction = _get_patch_growth_direction(logical_patch_types)
-
-    # Check if correlation is purely horizontal (all bridge directions are ±X)
-    is_purely_horizontal = all(
-        connection[2] in {"+X", "-X"} and connection[3] in {"+X", "-X"}
-        for connection in connections
-    )
 
     # Single patch case: no bridges
     if len(logical_patch_types) == 1:
@@ -297,7 +243,7 @@ def append_multi_pauli_correlations(
         visualisation_data.append(
             make_correlation_data(
                 make_side_id(input_ids[logical_index], output_ids[logical_index]),
-                _get_patch_correlation_directions(None, patch_growth_direction),
+                _get_patch_correlation_directions(None),
                 [bases[0]],
             )
         )
@@ -312,8 +258,6 @@ def append_multi_pauli_correlations(
         logical_indices,
         bases,
         bridge_direction=_get_opposite_direction(first_bridge_direction),
-        patch_growth_direction=patch_growth_direction,
-        is_purely_horizontal=is_purely_horizontal,
     )
 
     for connection_index, connection in enumerate(connections):
@@ -324,7 +268,6 @@ def append_multi_pauli_correlations(
             bridge_output_ids,
             bases,
             connection_index,
-            patch_growth_direction=patch_growth_direction,
         )
 
         # Append middle patches (between bridges)
@@ -341,7 +284,6 @@ def append_multi_pauli_correlations(
                 bases,
                 patch_index,
                 bridge_direction=middle_patch_direction,
-                patch_growth_direction=patch_growth_direction,
             )
 
     last_patch_direction = connections[-1][4]
@@ -352,7 +294,4 @@ def append_multi_pauli_correlations(
         logical_indices,
         bases,
         bridge_direction=last_patch_direction,
-        patch_growth_direction=patch_growth_direction,
-        last_patch=logical_patches[-1],
-        is_purely_horizontal=is_purely_horizontal,
     )

@@ -1,3 +1,4 @@
+# (c) Copyright Riverlane 2025-2026. All rights reserved.
 """Height attribute extraction utilities."""
 
 from xdsl.dialects.builtin import FloatAttr, IntAttr
