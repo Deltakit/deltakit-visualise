@@ -129,7 +129,8 @@ def _get_patch_correlation_directions(
 
     The surfaces depend on the direction patches are connecting (not growth):
     - If connecting via ±Y (vertical, blue sides): Use X-based surfaces spanning
-      vertically with directional extent in ±Y
+      vertically with directional extent in ±Y. For patches above (+Y incoming),
+      include X-Z for continuity with lower levels.
     - If connecting via ±X (horizontal, red sides): Use X-based surfaces spanning
       vertically with directional extent in ±X (Z direction in output)
 
@@ -148,8 +149,8 @@ def _get_patch_correlation_directions(
         # Vertical connection: span X with extent in ±Y and ±Z
         if bridge_direction == "+Y":
             return ["X+Y", "X-Z"]
-        # "-Y"
-        return ["X-Y", "X+Z"]
+        # "-Y": patch above connecting down; include X-Z for continuity
+        return ["X-Y", "X+Z", "X-Z"]
     if bridge_direction in {"+X", "-X"}:
         # Horizontal connection: span X vertically with extent in ±X
         # Both patches show full vertical span (X-Z and X+Z)

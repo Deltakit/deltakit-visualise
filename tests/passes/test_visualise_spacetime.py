@@ -1014,9 +1014,10 @@ class TestCorrelationDirectionHelpers:
         assert result[1] == "X-Z"
 
         result = _get_patch_correlation_directions(bridge_direction="-Y")
-        assert len(result) == 2
+        assert len(result) == 3
         assert result[0] == "X-Y"
         assert result[1] == "X+Z"
+        assert result[2] == "X-Z"
 
 
 class TestCorrelationSurfaceHelpers:
@@ -1163,6 +1164,15 @@ class TestMultiPauliCorrelationSurfaces:
         assert len(surfaces) == 2
         assert all(s.startswith("X") for s in surfaces)
         assert "X+Y" in surfaces
+        assert "X-Z" in surfaces
+
+        # For -Y (patch above): includes X-Z for continuity
+        surfaces = _get_patch_correlation_directions(bridge_direction="-Y")
+        assert isinstance(surfaces, list)
+        assert len(surfaces) == 3
+        assert all(s.startswith("X") for s in surfaces)
+        assert "X-Y" in surfaces
+        assert "X+Z" in surfaces
         assert "X-Z" in surfaces
 
     def test_make_correlation_data_z_basis_blue(self):
