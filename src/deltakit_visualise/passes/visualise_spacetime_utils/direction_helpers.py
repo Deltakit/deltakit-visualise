@@ -100,15 +100,16 @@ def _get_bridge_correlation_directions(
     """Get correlation surfaces for a bridge based on patch connection direction.
 
     The surfaces depend on the direction patches are connecting (not growth):
-    - If connecting via ±Y (vertical, blue sides): Use X-based surfaces with
-      directional extent
-    - If connecting via ±X (horizontal, red sides): Use only vertical surfaces X±Z
+    - If connecting via ±Y (vertical, blue sides): Use X-based surfaces spanning
+      vertically with directional extent in ±Y
+    - If connecting via ±X (horizontal, red sides): Use X-based surfaces spanning
+      vertically with directional extent in ±X
 
     Args:
         bridge_direction: Direction bridge connects patches (±X or ±Y)
 
     Returns:
-        List of surface notation strings (e.g., ["X+Y", "X-Y"] or ["X+Z", "X-Z"])
+        List of surface notation strings (e.g., ["X+Y", "X-Y"] or ["X-Z", "X+Z"])
         describing the correlation surfaces for the bridge.
 
     Note:
@@ -117,8 +118,8 @@ def _get_bridge_correlation_directions(
     if bridge_direction in {"+Y", "-Y"}:
         # Vertical connection (±Y): show X-based surfaces with extent in ±Y
         return ["X+Y", "X-Y"]
-    # Horizontal connection (±X): show only vertical surfaces
-    return ["X+Z", "X-Z"]
+    # Horizontal connection (±X): show X-based surfaces with extent in ±X
+    return ["X-Z", "X+Z"]
 
 
 def _get_patch_correlation_directions(
@@ -127,16 +128,17 @@ def _get_patch_correlation_directions(
     """Get correlation surfaces for a patch in a multi-Pauli measurement.
 
     The surfaces depend on the direction patches are connecting (not growth):
-    - If connecting via ±Y (vertical, blue sides): Use X-based surfaces with
-      directional extent
-    - If connecting via ±X (horizontal, red sides): Use only vertical surfaces X±Z
+    - If connecting via ±Y (vertical, blue sides): Use X-based surfaces spanning
+      vertically with directional extent in ±Y
+    - If connecting via ±X (horizontal, red sides): Use X-based surfaces spanning
+      vertically with directional extent in ±X (Z direction in output)
 
     Args:
         bridge_direction: Direction patch faces towards bridge (±X or ±Y), or None
             if no bridge connects to this patch.
 
     Returns:
-        List of surface notation strings (e.g., ["X+Y", "X-Z"] or ["X+Z", "X-Z"])
+        List of surface notation strings (e.g., ["X+Y", "X-Z"] or ["X-Z", "X+Z"])
         describing the correlation surfaces for the patch.
 
     Note:
@@ -149,8 +151,9 @@ def _get_patch_correlation_directions(
         # "-Y"
         return ["X-Y", "X+Z"]
     if bridge_direction in {"+X", "-X"}:
-        # Horizontal connection: use only vertical surfaces
-        return ["X+Z", "X-Z"]
+        # Horizontal connection: span X vertically with extent in ±X
+        # Both patches show full vertical span (X-Z and X+Z)
+        return ["X-Z", "X+Z"]
     # No bridge: vertical surfaces spanning X
     return ["X+Z", "X-Z"]
 
