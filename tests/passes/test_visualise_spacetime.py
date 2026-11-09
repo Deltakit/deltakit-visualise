@@ -49,9 +49,9 @@ from deltakit_visualise.passes.visualise_spacetime_utils.correlation_helpers imp
     make_correlation_data,
 )
 from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
-    _get_bridge_correlation_directions,
-    _get_opposite_direction,
-    _get_patch_correlation_directions,
+    get_bridge_correlation_directions,
+    get_opposite_direction,
+    get_patch_correlation_directions,
     get_patch_connection_directions,
 )
 from deltakit_visualise.types import (
@@ -934,86 +934,86 @@ class TestHandleMeasureOperation:
 class TestCorrelationDirectionHelpers:
     """Tests for correlation surface direction helper functions."""
 
-    def test_get_opposite_direction_plus_x(self):
+    def testget_opposite_direction_plus_x(self):
         """Test that +X flips to -X."""
 
-        result = _get_opposite_direction("+X")
+        result = get_opposite_direction("+X")
         assert result == "-X"
 
-    def test_get_opposite_direction_minus_x(self):
+    def testget_opposite_direction_minus_x(self):
         """Test that -X flips to +X."""
 
-        result = _get_opposite_direction("-X")
+        result = get_opposite_direction("-X")
         assert result == "+X"
 
-    def test_get_opposite_direction_plus_y(self):
+    def testget_opposite_direction_plus_y(self):
         """Test that +Y flips to -Y."""
 
-        result = _get_opposite_direction("+Y")
+        result = get_opposite_direction("+Y")
         assert result == "-Y"
 
-    def test_get_opposite_direction_minus_y(self):
+    def testget_opposite_direction_minus_y(self):
         """Test that -Y flips to +Y."""
 
-        result = _get_opposite_direction("-Y")
+        result = get_opposite_direction("-Y")
         assert result == "+Y"
 
-    def test_get_bridge_correlation_directions_y_axis(self):
+    def testget_bridge_correlation_directions_y_axis(self):
         """Test that Y-axis bridge (±Y connection, vertical) returns X-based surfaces."""
 
-        result = _get_bridge_correlation_directions("+Y")
+        result = get_bridge_correlation_directions("+Y")
         assert len(result) == 2
         assert result[0] == "X+Y"
         assert result[1] == "X-Y"
 
-        result = _get_bridge_correlation_directions("-Y")
+        result = get_bridge_correlation_directions("-Y")
         assert len(result) == 2
         assert result[0] == "X+Y"
         assert result[1] == "X-Y"
 
-    def test_get_bridge_correlation_directions_x_axis(self):
+    def testget_bridge_correlation_directions_x_axis(self):
         """Test that X-axis bridge (±X connection, horizontal) returns X-spanning surfaces."""
 
-        result = _get_bridge_correlation_directions("+X")
+        result = get_bridge_correlation_directions("+X")
         assert len(result) == 2
         assert result[0] == "X-Z"
         assert result[1] == "X+Z"
 
-        result = _get_bridge_correlation_directions("-X")
+        result = get_bridge_correlation_directions("-X")
         assert len(result) == 2
         assert result[0] == "X-Z"
         assert result[1] == "X+Z"
 
-    def test_get_patch_correlation_directions_no_bridge(self):
+    def testget_patch_correlation_directions_no_bridge(self):
         """Test that patch without bridge returns vertical surfaces spanning X with extent in ±Z."""
 
-        result = _get_patch_correlation_directions(bridge_direction=None)
+        result = get_patch_correlation_directions(bridge_direction=None)
         assert len(result) == 2
         assert result[0] == "X+Z"
         assert result[1] == "X-Z"
 
-    def test_get_patch_correlation_directions_with_x_bridge(self):
+    def testget_patch_correlation_directions_with_x_bridge(self):
         """Test that patch with X-axis (horizontal) bridge returns X-spanning surfaces."""
 
-        result = _get_patch_correlation_directions(bridge_direction="+X")
+        result = get_patch_correlation_directions(bridge_direction="+X")
         assert len(result) == 2
         assert result[0] == "X-Z"
         assert result[1] == "X+Z"
 
-        result = _get_patch_correlation_directions(bridge_direction="-X")
+        result = get_patch_correlation_directions(bridge_direction="-X")
         assert len(result) == 2
         assert result[0] == "X-Z"
         assert result[1] == "X+Z"
 
-    def test_get_patch_correlation_directions_with_y_bridge(self):
+    def testget_patch_correlation_directions_with_y_bridge(self):
         """Test that patch with Y-axis (vertical) bridge returns X-based surfaces."""
 
-        result = _get_patch_correlation_directions(bridge_direction="+Y")
+        result = get_patch_correlation_directions(bridge_direction="+Y")
         assert len(result) == 2
         assert result[0] == "X+Y"
         assert result[1] == "X-Z"
 
-        result = _get_patch_correlation_directions(bridge_direction="-Y")
+        result = get_patch_correlation_directions(bridge_direction="-Y")
         assert len(result) == 3
         assert result[0] == "X-Y"
         assert result[1] == "X+Z"
@@ -1109,10 +1109,10 @@ class TestMultiPauliCorrelationSurfaces:
             assert len(result) == 2
             assert all(isinstance(d, str) for d in result)
 
-    def test_get_bridge_correlation_directions_plus_y(self):
+    def testget_bridge_correlation_directions_plus_y(self):
         """Test bridge directions for ±Y connection (vertical, AC measurement)."""
 
-        surfaces = _get_bridge_correlation_directions("+Y")
+        surfaces = get_bridge_correlation_directions("+Y")
         assert isinstance(surfaces, list)
         assert len(surfaces) == 2
         assert all(isinstance(s, str) for s in surfaces)
@@ -1121,10 +1121,10 @@ class TestMultiPauliCorrelationSurfaces:
         assert "X+Y" in surfaces
         assert "X-Y" in surfaces
 
-    def test_get_bridge_correlation_directions_plus_x(self):
+    def testget_bridge_correlation_directions_plus_x(self):
         """Test bridge directions for ±X connection (horizontal, BC measurement)."""
 
-        surfaces = _get_bridge_correlation_directions("+X")
+        surfaces = get_bridge_correlation_directions("+X")
         assert isinstance(surfaces, list)
         assert len(surfaces) == 2
         # Horizontal connection (±X) should return X-spanning surfaces
@@ -1132,10 +1132,10 @@ class TestMultiPauliCorrelationSurfaces:
         assert "X-Z" in surfaces
         assert "X+Z" in surfaces
 
-    def test_get_patch_correlation_directions_no_bridge(self):
-        """Test _get_patch_correlation_directions with no bridge."""
+    def testget_patch_correlation_directions_no_bridge(self):
+        """Test get_patch_correlation_directions with no bridge."""
 
-        surfaces = _get_patch_correlation_directions(bridge_direction=None)
+        surfaces = get_patch_correlation_directions(bridge_direction=None)
         assert isinstance(surfaces, list)
         assert len(surfaces) == 2
         assert all(isinstance(s, str) for s in surfaces)
@@ -1144,22 +1144,22 @@ class TestMultiPauliCorrelationSurfaces:
         assert "X-Z" in surfaces
         assert "X+Z" in surfaces
 
-    def test_get_patch_correlation_directions_with_x_bridge(self):
-        """Test _get_patch_correlation_directions with X-axis (horizontal) bridge."""
+    def testget_patch_correlation_directions_with_x_bridge(self):
+        """Test get_patch_correlation_directions with X-axis (horizontal) bridge."""
 
         # Horizontal connection (±X): patches use X-spanning surfaces
-        surfaces = _get_patch_correlation_directions(bridge_direction="+X")
+        surfaces = get_patch_correlation_directions(bridge_direction="+X")
         assert isinstance(surfaces, list)
         assert len(surfaces) == 2
         assert all(s.startswith("X") for s in surfaces)
         assert "X-Z" in surfaces
         assert "X+Z" in surfaces
 
-    def test_get_patch_correlation_directions_with_y_bridge(self):
-        """Test _get_patch_correlation_directions with Y-axis (vertical) bridge."""
+    def testget_patch_correlation_directions_with_y_bridge(self):
+        """Test get_patch_correlation_directions with Y-axis (vertical) bridge."""
 
         # Vertical connection (±Y): patches span X with extent in ±Y and ±Z
-        surfaces = _get_patch_correlation_directions(bridge_direction="+Y")
+        surfaces = get_patch_correlation_directions(bridge_direction="+Y")
         assert isinstance(surfaces, list)
         assert len(surfaces) == 2
         assert all(s.startswith("X") for s in surfaces)
@@ -1167,7 +1167,7 @@ class TestMultiPauliCorrelationSurfaces:
         assert "X-Z" in surfaces
 
         # For -Y (patch above): includes X-Z for continuity
-        surfaces = _get_patch_correlation_directions(bridge_direction="-Y")
+        surfaces = get_patch_correlation_directions(bridge_direction="-Y")
         assert isinstance(surfaces, list)
         assert len(surfaces) == 3
         assert all(s.startswith("X") for s in surfaces)

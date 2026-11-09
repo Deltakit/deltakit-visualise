@@ -18,9 +18,9 @@ from deltakit_visualise.utils.attributes import (
 )
 
 from .direction_helpers import (
-    _get_bridge_correlation_directions,
-    _get_opposite_direction,
-    _get_patch_correlation_directions,
+    get_bridge_correlation_directions,
+    get_opposite_direction,
+    get_patch_correlation_directions,
     get_patch_connection_directions,
 )
 
@@ -120,7 +120,7 @@ def _append_first_patch_correlation(
     The patch surfaces are determined by the direction it faces towards the bridge
     and the primary growth direction of the patch chain.
     """
-    surfaces = _get_patch_correlation_directions(bridge_direction)
+    surfaces = get_patch_correlation_directions(bridge_direction)
 
     visualisation_data.append(
         make_correlation_data(
@@ -145,7 +145,7 @@ def _append_middle_patch_correlation(
     Middle patches should show full correlation surfaces based on their connection
     direction and the patch growth direction.
     """
-    surfaces = _get_patch_correlation_directions(bridge_direction)
+    surfaces = get_patch_correlation_directions(bridge_direction)
 
     visualisation_data.append(
         make_correlation_data(
@@ -172,7 +172,7 @@ def _append_last_patch_correlation(
     The surfaces are determined by the direction the last patch faces towards the bridge
     and the primary growth direction of the patch chain.
     """
-    surfaces = _get_patch_correlation_directions(bridge_direction)
+    surfaces = get_patch_correlation_directions(bridge_direction)
 
     visualisation_data.append(
         make_correlation_data(
@@ -200,7 +200,7 @@ def _append_bridge_correlation(
     else:
         bridge_bases = [bases[connection_index]] if connection_index < len(bases) else []
 
-    directions = _get_bridge_correlation_directions(bridge_direction_in)
+    directions = get_bridge_correlation_directions(bridge_direction_in)
 
     visualisation_data.append(
         make_correlation_data(
@@ -246,7 +246,7 @@ def append_multi_pauli_correlations(
         visualisation_data.append(
             make_correlation_data(
                 make_side_id(input_ids[logical_index], output_ids[logical_index]),
-                _get_patch_correlation_directions(None),
+                get_patch_correlation_directions(None),
                 [bases[0]],
             )
         )
@@ -260,7 +260,7 @@ def append_multi_pauli_correlations(
         output_ids,
         logical_indices,
         bases,
-        bridge_direction=_get_opposite_direction(first_bridge_direction),
+        bridge_direction=get_opposite_direction(first_bridge_direction),
     )
 
     for connection_index, connection in enumerate(connections):
@@ -278,7 +278,7 @@ def append_multi_pauli_correlations(
         if patch_index < len(logical_patch_types) - 1:
             # Middle patch faces the next bridge with direction from next connection
             next_connection = connections[connection_index + 1]
-            middle_patch_direction = _get_opposite_direction(next_connection[1])
+            middle_patch_direction = get_opposite_direction(next_connection[1])
             _append_middle_patch_correlation(
                 visualisation_data,
                 input_ids,

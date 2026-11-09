@@ -24,7 +24,7 @@ def get_rotation_direction(
     raise ValueError(msg)
 
 
-def _direction_to_surface(orientation: str, direction: str) -> str:
+def direction_to_surface(orientation: str, direction: str) -> str:
     """Convert orientation and direction to surface notation.
 
     In this coordinate system, Y is mapped to Z (vertical/height axis) and Z is
@@ -81,7 +81,7 @@ def _get_opposing_sides_map() -> dict[tuple[str, str], tuple[str, str]]:
     }
 
 
-def _get_opposite_direction(direction: str) -> str:
+def get_opposite_direction(direction: str) -> str:
     """Get opposite direction: +X ↔ -X, +Y ↔ -Y."""
     if direction == "+X":
         return "-X"
@@ -94,7 +94,7 @@ def _get_opposite_direction(direction: str) -> str:
     return direction
 
 
-def _get_bridge_correlation_directions(
+def get_bridge_correlation_directions(
     bridge_direction: str,
 ) -> list[str]:
     """Get correlation surfaces for a bridge based on patch connection direction.
@@ -122,7 +122,7 @@ def _get_bridge_correlation_directions(
     return ["X-Z", "X+Z"]
 
 
-def _get_patch_correlation_directions(
+def get_patch_correlation_directions(
     bridge_direction: str | None = None,
 ) -> list[str]:
     """Get correlation surfaces for a patch in a multi-Pauli measurement.
