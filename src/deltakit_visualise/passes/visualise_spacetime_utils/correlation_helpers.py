@@ -94,6 +94,9 @@ def make_correlation_data(
         surfaces: List of correlation surface descriptions (e.g., "X+Z", "Y-X",
             where Z is vertical).
         bases: List of Pauli bases for colour determination.
+
+    Returns:
+        A CorrelationData dictionary with type, blockId, surfaces, and colour.
     """
     colour = SurfaceColour.set_colour_scheme(bases[0])
     return {
@@ -222,7 +225,7 @@ def append_multi_pauli_correlations(
     - Middle patches: surfaces based on growth direction
     - Last patch: surfaces based on growth direction and bridge connection
 
-    The growth direction is determined by analyzing patch positions.
+    The growth direction is determined by analysing patch positions.
     """
     # Extract and validate data
     logical_patch_types = [cast(SurfaceCodeBasePatch, patch.type) for patch in logical_patches]

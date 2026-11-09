@@ -888,7 +888,8 @@ def append_correlation_gap_data(
                 location = first_base["location"]
                 size = first_base["size"]
                 prepared_patches = [
-                    surf for surf in surfaces.values()
+                    surf
+                    for surf in surfaces.values()
                     if surf.get("location") == location
                     and surf.get("size") == size
                     and surf.get("startHeight") == 0

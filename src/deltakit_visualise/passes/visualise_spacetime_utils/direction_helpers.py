@@ -30,6 +30,14 @@ def _direction_to_surface(orientation: str, direction: str) -> str:
     In this coordinate system, Y is mapped to Z (vertical/height axis) and Z is
     mapped to Y.
 
+    Args:
+        orientation: Either "horizontal" or "vertical" indicating surface orientation.
+        direction: The direction indicator (e.g., "+X", "-Y") in the patch coordinate system.
+
+    Returns:
+        A surface notation string (e.g., "X+Z", "Y-X") describing the surface in the
+        coordinate system where Z represents vertical/height.
+
     Examples:
         ("horizontal", "+X") → "Y+X" (Y spans completely, +X direction)
         ("horizontal", "-X") → "Y-X" (Y spans completely, -X direction)
@@ -99,7 +107,12 @@ def _get_bridge_correlation_directions(
     Args:
         bridge_direction: Direction bridge connects patches (±X or ±Y)
 
-    Note: Y is vertical (mapped to Z); Z is horizontal (mapped to Y).
+    Returns:
+        List of surface notation strings (e.g., ["X+Y", "X-Y"] or ["X+Z", "X-Z"])
+        describing the correlation surfaces for the bridge.
+
+    Note:
+        Y is vertical (mapped to Z); Z is horizontal (mapped to Y).
     """
     if bridge_direction in {"+Y", "-Y"}:
         # Vertical connection (±Y): show X-based surfaces with extent in ±Y
@@ -119,9 +132,15 @@ def _get_patch_correlation_directions(
     - If connecting via ±X (horizontal, red sides): Use only vertical surfaces X±Z
 
     Args:
-        bridge_direction: Direction patch faces towards bridge (±X or ±Y)
+        bridge_direction: Direction patch faces towards bridge (±X or ±Y), or None
+            if no bridge connects to this patch.
 
-    Note: Y is vertical (mapped to Z); Z is horizontal (mapped to Y).
+    Returns:
+        List of surface notation strings (e.g., ["X+Y", "X-Z"] or ["X+Z", "X-Z"])
+        describing the correlation surfaces for the patch.
+
+    Note:
+        Y is vertical (mapped to Z); Z is horizontal (mapped to Y).
     """
     if bridge_direction in {"+Y", "-Y"}:
         # Vertical connection: span X with extent in ±Y and ±Z

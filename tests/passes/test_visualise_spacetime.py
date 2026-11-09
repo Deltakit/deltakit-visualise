@@ -1072,9 +1072,7 @@ class TestCorrelationSurfaceHelpers:
         """Test that make_correlation_data creates valid structure with surfaces."""
 
         surfaces = ["X-Z", "X+Z"]
-        result = make_correlation_data(
-            "test_side", surfaces, [PauliAttr.Z()]
-        )
+        result = make_correlation_data("test_side", surfaces, [PauliAttr.Z()])
 
         assert result["type"] == "correlation"
         assert result["blockId"] == "test_side"
@@ -1085,9 +1083,7 @@ class TestCorrelationSurfaceHelpers:
         """Test that make_correlation_data returns RED for X basis."""
 
         surfaces = ["Y+X", "Y-X"]
-        result = make_correlation_data(
-            "test_side", surfaces, [PauliAttr.X()]
-        )
+        result = make_correlation_data("test_side", surfaces, [PauliAttr.X()])
 
         assert result["colour"] == SurfaceColour.RED  # X basis -> RED
 
