@@ -61,6 +61,7 @@ from deltakit_visualise.utils.attributes import (
     get_string_list_attr,
 )
 from deltakit_visualise.utils.patch_geometry import VisibleSides, get_visible_sides
+from deltakit_visualise.utils.ssa import unwrap_parallel_value
 
 
 def get_start_height(op: Operation) -> float:
@@ -588,7 +589,12 @@ def handle_move_operation(op: MoveOp, visualisation_data: list[SpaceTimeVisualis
 
 
 def get_move_bridge_surface_ids(op: MoveOp, bridge: SSAValue) -> tuple[str | None, str | None]:
-    """Find existing preparation and closing measurement surfaces for a bridge."""
+    """Find existing preparation and closing measurement surfaces for a bridge.
+
+    Returns:
+        A tuple containing the preparation surface ID and closing measurement surface ID,
+        respectively. Either value is ``None`` if the corresponding surface is not found.
+    """
     end_surface_id = next(
         (
             get_attr_str(use.operation, OUT_OP_ID)
@@ -598,14 +604,7 @@ def get_move_bridge_surface_ids(op: MoveOp, bridge: SSAValue) -> tuple[str | Non
         ),
         None,
     )
-    # Traverse through parallel operations to find the actual bridge SSAValue if needed
-    while isinstance(bridge, OpResult) and isinstance(bridge.op, ParallelOp):
-        yielded_values: list[SSAValue] = []
-        for region in bridge.op.par_regions:
-            terminator = region.block.last_op
-            if isinstance(terminator, YieldOp):
-                yielded_values.extend(terminator.operands)
-        bridge = yielded_values[bridge.index]
+    bridge = unwrap_parallel_value(bridge)
     start_surface_id = (
         get_attr_str(bridge.op, IN_OP_ID)
         if isinstance(bridge, OpResult) and isinstance(bridge.op, PrepareOp)
