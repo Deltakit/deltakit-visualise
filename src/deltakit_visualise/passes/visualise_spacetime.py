@@ -591,6 +591,10 @@ def handle_move_operation(op: MoveOp, visualisation_data: list[SpaceTimeVisualis
 def get_move_bridge_surface_ids(op: MoveOp, bridge: SSAValue) -> tuple[str | None, str | None]:
     """Find existing preparation and closing measurement surfaces for a bridge.
 
+    Args:
+        op: The move operation associated with the bridge.
+        bridge: The bridge SSA value to inspect for existing surfaces.
+
     Returns:
         A tuple containing the preparation surface ID and closing measurement surface ID,
         respectively. Either value is ``None`` if the corresponding surface is not found.

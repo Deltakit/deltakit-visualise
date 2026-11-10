@@ -1,3 +1,4 @@
+# (c) Copyright Riverlane 2025-2026. All rights reserved.
 """Helpers for working with SSA values."""
 
 from deltakit_compile.dialects.qstruct import ParallelOp, YieldOp
