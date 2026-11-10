@@ -20,8 +20,8 @@ from deltakit_visualise.utils.attributes import (
 from .direction_helpers import (
     get_bridge_correlation_directions,
     get_opposite_direction,
-    get_patch_correlation_directions,
     get_patch_connection_directions,
+    get_patch_correlation_directions,
 )
 
 

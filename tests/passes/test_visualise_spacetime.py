@@ -51,8 +51,8 @@ from deltakit_visualise.passes.visualise_spacetime_utils.correlation_helpers imp
 from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
     get_bridge_correlation_directions,
     get_opposite_direction,
-    get_patch_correlation_directions,
     get_patch_connection_directions,
+    get_patch_correlation_directions,
 )
 from deltakit_visualise.types import (
     RotateColour,
