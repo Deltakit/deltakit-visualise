@@ -6,6 +6,7 @@ from deltakit_compile.dialects.logical_assembly import (
     GrowOp,
     MeasStabOp,
     MeasureOp,
+    MoveOp,
     MultiPauliMeasOp,
     OrientationEnum,
     PatchDeclarationOp,
@@ -17,6 +18,7 @@ from deltakit_compile.dialects.logical_assembly import (
     StepOp,
 )
 from deltakit_compile.dialects.qcore import PauliAttr
+from deltakit_compile.frontend.logasm import LogAsmBuilder, RotatedPlanarPatch
 from xdsl.dialects import test
 from xdsl.dialects.builtin import ArrayAttr, IntAttr, StringAttr
 
@@ -25,17 +27,20 @@ from deltakit_visualise.constants import (
     IN_BRIDGE_PATCHES_ID,
     IN_LOGICAL_PATCHES_ID,
     IN_OP_ID,
+    MOVE_BRIDGE_PATCHES_ID,
     OUT_BRIDGE_PATCHES_ID,
     OUT_LOGICAL_PATCHES_ID,
     OUT_OP_ID,
     START_HEIGHT_ATTR,
 )
+from deltakit_visualise.logical_assembly_visualiser import LogicalAssemblyVisualiser
 from deltakit_visualise.passes.visualise_spacetime import (
     get_end_height,
     get_start_height,
     handle_grow_operation,
     handle_measure_operation,
     handle_measure_stabiliser,
+    handle_move_operation,
     handle_multi_pauli_measurement,
     handle_operation,
     handle_patch_declaration,
@@ -44,6 +49,7 @@ from deltakit_visualise.passes.visualise_spacetime import (
     handle_shrink_operation,
     handle_step_operation,
 )
+from deltakit_visualise.pipelines.spacetime import SpacetimePipeline
 from deltakit_visualise.types import (
     RotateColour,
     SideColour,
@@ -55,6 +61,7 @@ from deltakit_visualise.utils.attributes import (
     get_patch_orientation,
     get_patch_size,
 )
+from deltakit_visualise.visualiser import get_visualisation_data
 from tests.conftest import make_size
 
 
@@ -608,6 +615,81 @@ class TestHandleStepOperation:
         assert visualisation_data[2]["location"] == end_location
 
 
+class TestHandleMoveOperation:
+    """Tests for handle_move_operation handler."""
+
+    def test_emits_surfaces_and_hides_sides_connected_to_bridge(self) -> None:
+        """Move side records match the schema and hide faces against bridges."""
+        start_type = RotatedPlanarPatchType(
+            make_size(4, 4), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        bridge_type = RotatedPlanarPatchType(
+            make_size(4, 4), PlacementAttr([4, 0], OrientationEnum.VERTICAL_Z)
+        )
+        end_type = RotatedPlanarPatchType(
+            make_size(4, 4), PlacementAttr([8, 0], OrientationEnum.VERTICAL_Z)
+        )
+        patch, bridge = test.TestOp(result_types=[start_type, bridge_type]).res
+        op = MoveOp(patch, 4, [bridge], end_type)
+        op.attributes[START_HEIGHT_ATTR] = IntAttr(2)
+        op.attributes[END_HEIGHT_ATTR] = IntAttr(6)
+        op.attributes[IN_OP_ID] = StringAttr("move_start")
+        op.attributes[OUT_OP_ID] = StringAttr("move_end")
+        op.attributes[MOVE_BRIDGE_PATCHES_ID] = ArrayAttr([StringAttr("bridge")])
+        visualisation_data: list[SpaceTimeVisualisationItem] = []
+
+        handle_move_operation(op, visualisation_data)
+
+        assert [item["type"] for item in visualisation_data] == [
+            "surface",
+            "surface",
+            "side",
+            "surface",
+            "surface",
+            "side",
+            "surface",
+            "surface",
+            "side",
+        ]
+        assert visualisation_data[0]["location"] == (0, 0)
+        assert visualisation_data[0]["startHeight"] == 2.0
+        source_sides = visualisation_data[2]
+        bridge_bottom = visualisation_data[3]
+        bridge_top = visualisation_data[4]
+        bridge_sides = visualisation_data[5]
+        destination_sides = visualisation_data[8]
+        assert source_sides["op_name"] == "log_asm.move"
+        assert source_sides["fromSurfaceId"] == "move_start"
+        assert source_sides["toSurfaceId"] == "move_start_end"
+        assert source_sides["sides"] == {
+            "+X": False,
+            "-X": True,
+            "+Y": True,
+            "-Y": True,
+        }
+        assert bridge_bottom["id"] == "bridge_bottom"
+        assert bridge_bottom["colour"] == SurfaceColour.BLUE
+        assert bridge_bottom["startHeight"] == 2.0
+        assert bridge_top["id"] == "bridge_top"
+        assert bridge_top["colour"] == SurfaceColour.BLUE
+        assert bridge_top["startHeight"] == 6.0
+        assert bridge_sides["colourScheme"] == (SideColour.RED, SideColour.BLUE)
+        assert bridge_sides["fromSurfaceId"] == "bridge_bottom"
+        assert bridge_sides["toSurfaceId"] == "bridge_top"
+        assert visualisation_data[6]["location"] == (8, 0)
+        assert visualisation_data[6]["startHeight"] == 2.0
+        assert visualisation_data[7]["location"] == (8, 0)
+        assert visualisation_data[7]["startHeight"] == 6.0
+        assert destination_sides["fromSurfaceId"] == "move_end_start"
+        assert destination_sides["toSurfaceId"] == "move_end"
+        assert destination_sides["sides"] == {
+            "+X": True,
+            "-X": False,
+            "+Y": True,
+            "-Y": True,
+        }
+
+
 class TestHandleRotateOperation:
     """Tests for handle_rotate_operation handler."""
 
@@ -885,6 +967,67 @@ class TestHandleRotateOperation:
 
 class TestHandleMeasureOperation:
     """Tests for handle_measure_operation handler."""
+
+    @pytest.mark.parametrize("vertical_z", [False, True])
+    @pytest.mark.parametrize("bridge_count", [1, 2])
+    def test_move_bridge_measurements_match_source_top(
+        self, vertical_z: bool, bridge_count: int
+    ) -> None:
+        """Automatic bridge measurements share the moved source's top colour."""
+        builder = LogAsmBuilder()
+        patch = builder.declare_patch(
+            RotatedPlanarPatch(4, 4, location=(0, 0), vertical_z=vertical_z)
+        )
+        bridges = [
+            builder.declare_patch(
+                RotatedPlanarPatch(4, 4, location=(4 * index, 0), vertical_z=vertical_z)
+            )
+            for index in range(1, bridge_count + 1)
+        ]
+        patch.prepare("X")
+        patch.measure_stabilisers(min_rounds=4)
+        patch.move((4 * (bridge_count + 1), 0), bridges=bridges, rounds=4)
+        visualiser = LogicalAssemblyVisualiser(builder)
+
+        SpacetimePipeline().apply(visualiser.context, visualiser.module)
+
+        items = get_visualisation_data(visualiser.module)["ops"]
+        source_top = next(
+            item
+            for item in items
+            if item["type"] == "surface"
+            and item["op_name"] == "log_asm.move"
+            and item["location"] == [0, 0]
+            and item["startHeight"] == 8
+        )
+        measurements = [item for item in items if item["op_name"] == "log_asm.measure"]
+        assert len(measurements) == bridge_count
+        assert all(item["colour"] == source_top["colour"] for item in measurements)
+        assert all(item["startHeight"] == source_top["startHeight"] for item in measurements)
+        move_sides = [
+            item for item in items if item["type"] == "side" and item["op_name"] == "log_asm.move"
+        ]
+        side_endpoints = {(item["fromSurfaceId"], item["toSurfaceId"]) for item in move_sides}
+        for measurement in measurements:
+            preparation = next(
+                item
+                for item in items
+                if item["op_name"] == "log_asm.prepare"
+                and item["location"] == measurement["location"]
+            )
+            assert (preparation["id"], measurement["id"]) in side_endpoints
+            assert preparation["startHeight"] == 4
+            assert not any(
+                item["type"] == "surface"
+                and item["op_name"] == "log_asm.move"
+                and item["location"] == measurement["location"]
+                for item in items
+            )
+        surface_ids = {item["id"] for item in items if item["type"] == "surface"}
+        assert all(
+            item["fromSurfaceId"] in surface_ids and item["toSurfaceId"] in surface_ids
+            for item in move_sides
+        )
 
     @pytest.mark.parametrize(
         ("basis", "expected_colour"),
