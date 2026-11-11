@@ -215,10 +215,6 @@ deltakit-circuit/src/deltakit_circuit/_version.py
 docs/generated/
 docs/jupyter_execute
 
-# Test artifacts
-.lit_test_times.txt
-*.tmp.json
-
 # notebooks are copied there while building docs
 docs/explorer/google_qmem_experiment/
 docs/explorer/simulation/
