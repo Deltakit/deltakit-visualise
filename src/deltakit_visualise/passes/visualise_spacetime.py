@@ -7,6 +7,7 @@ using the xDSL framework patterns for visualisation purposes.
 import json
 from dataclasses import dataclass
 from functools import singledispatch
+from itertools import pairwise
 from typing import cast
 
 from deltakit_compile.dialects.logical_assembly import (
@@ -14,8 +15,6 @@ from deltakit_compile.dialects.logical_assembly import (
     MeasStabOp,
     MeasureOp,
     MultiPauliMeasOp,
-    OrientationAttr,
-    OrientationEnum,
     PatchDeclarationOp,
     PrepareOp,
     RotateOp,
@@ -24,19 +23,36 @@ from deltakit_compile.dialects.logical_assembly import (
     SurfaceCodeBasePatch,
 )
 from deltakit_compile.dialects.qstruct import OutputOp, ParallelOp, YieldOp
+from deltakit_compile.dialects.sobs import DecUnplacedObservableOp, LocateUnplacedObservableOp
 from xdsl.dialects.builtin import FloatAttr as FloatAttr  # noqa: PLC0414
-from xdsl.dialects.builtin import IntAttr, ModuleOp, StringAttr
+from xdsl.dialects.builtin import ModuleOp, StringAttr
 from xdsl.ir import Operation
 from xdsl.passes import ModulePass
 
 from deltakit_visualise.constants import (
-    END_HEIGHT_ATTR,
     IN_OP_ID,
     OUT_OP_ID,
-    START_HEIGHT_ATTR,
     VISUALISE_SPACETIME_DATA,
 )
+from deltakit_visualise.passes.visualise_spacetime_utils.correlation_helpers import (
+    append_multi_pauli_correlations,
+    make_correlation_data,
+    make_side_id,
+)
+from deltakit_visualise.passes.visualise_spacetime_utils.direction_helpers import (
+    get_rotation_direction,
+    to_side_visibility,
+)
+from deltakit_visualise.passes.visualise_spacetime_utils.height_helpers import (
+    get_end_height,
+    get_start_height,
+)
+from deltakit_visualise.passes.visualise_spacetime_utils.surface_helpers import (
+    get_rotate_colour_scheme,
+    get_rotate_surface_colours,
+)
 from deltakit_visualise.types import (
+    CorrelationData,
     RotateColour,
     RotateData,
     SideColour,
@@ -57,94 +73,9 @@ from deltakit_visualise.utils.attributes import (
     get_patch_orientation,
     get_patch_size,
 )
-from deltakit_visualise.utils.patch_geometry import VisibleSides, get_visible_sides
-
-
-def get_start_height(op: Operation) -> float:
-    """Get the start_height attribute from an operation."""
-    attr = op.attributes.get(START_HEIGHT_ATTR)
-    if isinstance(attr, IntAttr):
-        return float(attr.data)
-    if isinstance(attr, FloatAttr):
-        return attr.value.data
-    msg = f"Operation {op.name} is missing a valid {START_HEIGHT_ATTR} attribute"
-    raise ValueError(msg)
-
-
-def get_end_height(op: Operation) -> float:
-    """Get the end_height attribute from an operation."""
-    attr = op.attributes.get(END_HEIGHT_ATTR)
-    if isinstance(attr, IntAttr):
-        return float(attr.data)
-    if isinstance(attr, FloatAttr):
-        return attr.value.data
-    msg = f"Operation {op.name} is missing a valid {END_HEIGHT_ATTR} attribute"
-    raise ValueError(msg)
-
-
-def get_rotation_direction(
-    start_location: tuple[float, float], end_location: tuple[float, float]
-) -> str:
-    """Get the signed axis ("+x", "-x", "+y" or "-y") along which a rotated patch is displaced."""
-    dx = end_location[0] - start_location[0]
-    dy = end_location[1] - start_location[1]
-    if dx != 0 and dy == 0:
-        return "+x" if dx > 0 else "-x"
-    if dy != 0 and dx == 0:
-        return "+y" if dy > 0 else "-y"
-    msg = (
-        "RotateOp must move the patch along exactly one axis, "
-        f"but moved from {start_location} to {end_location}"
-    )
-    raise ValueError(msg)
-
-
-def to_side_visibility(*visible: VisibleSides) -> SideVisibility:
-    """Combine visible sides; a side is shown only if visible in all inputs."""
-    return {
-        "+X": all(v.right for v in visible),
-        "-X": all(v.left for v in visible),
-        "+Y": all(v.top for v in visible),
-        "-Y": all(v.bottom for v in visible),
-    }
-
-
-def get_rotate_colour_scheme(
-    orientation: OrientationAttr,
-    rotation_direction: str,
-) -> tuple[RotateColour, RotateColour, RotateColour, RotateColour]:
-    """Get the rotate colour scheme, swapping positions 3/4 for x and 1/2 for y."""
-    return RotateColour.set_colour_scheme(
-        orientation=orientation, rotation_direction=rotation_direction
-    )
-
-
-def get_rotate_surface_colours(
-    orientation: OrientationAttr, rotation_direction: str
-) -> tuple[SurfaceColour | None, SurfaceColour | None]:
-    """Get top and bottom surface colours for a patch rotation."""
-    direction = rotation_direction.lstrip("+-")
-
-    surface_colours = {
-        (OrientationEnum.HORIZONTAL_Z, "x"): (
-            SurfaceColour.RED,
-            SurfaceColour.BLUE,
-        ),
-        (OrientationEnum.VERTICAL_Z, "y"): (
-            SurfaceColour.RED,
-            SurfaceColour.BLUE,
-        ),
-        (OrientationEnum.HORIZONTAL_Z, "y"): (
-            SurfaceColour.BLUE,
-            SurfaceColour.RED,
-        ),
-        (OrientationEnum.VERTICAL_Z, "x"): (
-            SurfaceColour.BLUE,
-            SurfaceColour.RED,
-        ),
-    }
-
-    return surface_colours.get((orientation.data, direction), (None, None))
+from deltakit_visualise.utils.patch_geometry import (
+    get_visible_sides,
+)
 
 
 @singledispatch
@@ -247,6 +178,7 @@ def handle_measure_stabiliser(
 
     surface_data: SidesData = {
         "type": "side",
+        "id": make_side_id(get_attr_str(op, IN_OP_ID), get_attr_str(op, OUT_OP_ID)),
         "op_name": op.name,
         "colourScheme": colour_scheme,
         "sides": {"+X": True, "-X": True, "+Y": True, "-Y": True},
@@ -340,6 +272,7 @@ def handle_grow_operation(op: GrowOp, visualisation_data: list[SpaceTimeVisualis
             # Create the sides connecting the initial and final surfaces of the grown patch
             {
                 "type": "side",
+                "id": make_side_id(initial_to_patch_id, final_to_patch_id),
                 "op_name": op.name,
                 "colourScheme": SideColour.set_colour_scheme(get_patch_orientation(to_patch)),
                 "sides": {"+X": True, "-X": True, "+Y": True, "-Y": True},
@@ -405,6 +338,7 @@ def handle_shrink_operation(
             # Create the sides connecting the initial and final surfaces of the shrunk patch
             {
                 "type": "side",
+                "id": make_side_id(initial_to_patch_id, final_to_patch_id),
                 "op_name": op.name,
                 "colourScheme": SideColour.set_colour_scheme(get_patch_orientation(to_patch)),
                 "sides": {"+X": True, "-X": True, "+Y": True, "-Y": True},
@@ -532,6 +466,7 @@ def append_rotate_bridge_data(
             },
             {
                 "type": "side",
+                "id": make_side_id(bridge_start_id, bridge_mid_id),
                 "op_name": op.name,
                 "colourScheme": SideColour.set_colour_scheme(from_orientation),
                 "sides": bridge_sides,
@@ -624,6 +559,7 @@ def handle_rotate_operation(
     # Add a sides element for the rotate operation for initial patch
     rotate_side_from: SidesData = {
         "type": "side",
+        "id": make_side_id(from_start_id, from_mid_id),
         "op_name": op.name,
         "colourScheme": SideColour.set_colour_scheme(from_orientation),
         "sides": from_sides,
@@ -701,6 +637,7 @@ def handle_rotate_operation(
     # Add sides for the rotate operation for the target patch connecting the mid and top surfaces
     rotate_side_to: SidesData = {
         "type": "side",
+        "id": make_side_id(to_mid_id, to_top_id),
         "op_name": op.name,
         "colourScheme": SideColour.set_colour_scheme(to_orientation),
         "sides": to_sides,
@@ -713,6 +650,81 @@ def handle_rotate_operation(
     visualisation_data.append(rotate_surface_to_top)
     visualisation_data.append(rotate_side_to)
     visualisation_data.append(rotate_to)
+
+
+@handle_operation.register
+def handle_dec_unplaced_observable(
+    op: DecUnplacedObservableOp, visualisation_data: list[SpaceTimeVisualisationItem]
+) -> None:
+    """Handle DecUnplacedObservableOp for visualisation."""
+
+
+@handle_operation.register
+def handle_locate_unplaced_opbservable(
+    op: LocateUnplacedObservableOp, visualisation_data: list[SpaceTimeVisualisationItem]
+) -> None:
+    """Handle LocateUnplacedObservableOp for visualisation."""
+    resolved_patches = []
+    patch_owners = []
+    for patch in op.patches:
+        resolved_patch = patch
+        patch_owner = patch.owner
+        if isinstance(patch_owner, ParallelOp):
+            resolved_patch = patch_owner.result_to_yield_arg(patch)
+            patch_owner = resolved_patch.owner
+        resolved_patches.append(resolved_patch)
+        patch_owners.append(patch_owner)
+
+    if (
+        patch_owners
+        and isinstance(patch_owners[0], MultiPauliMeasOp)
+        and all(patch_owner is patch_owners[0] for patch_owner in patch_owners)
+    ):
+        multi_pauli_op = patch_owners[0]
+        append_multi_pauli_correlations(op, multi_pauli_op, resolved_patches, visualisation_data)
+        return
+
+    for patch, basis in zip(resolved_patches, op.bases.data, strict=True):
+        patch_owner = patch.owner
+
+        if isinstance(patch_owner, MultiPauliMeasOp):
+            patch_index = patch_owner.res.index(patch)
+            side_id = make_side_id(
+                get_in_logical_patch_ids(patch_owner)[patch_index],
+                get_out_logical_patch_ids(patch_owner)[patch_index],
+            )
+        elif isinstance(patch_owner, MeasStabOp):
+            side_id = make_side_id(
+                get_attr_str(patch_owner, IN_OP_ID),
+                get_attr_str(patch_owner, OUT_OP_ID),
+            )
+        elif isinstance(patch_owner, PrepareOp):
+            next_measurement = next(
+                (use.operation for use in patch.uses if isinstance(use.operation, MeasStabOp)),
+                None,
+            )
+            if next_measurement is None:
+                msg = "A prepared-patch correlation requires a following stabiliser measurement."
+                raise ValueError(msg)
+            side_id = make_side_id(
+                get_attr_str(next_measurement, IN_OP_ID),
+                get_attr_str(next_measurement, OUT_OP_ID),
+            )
+        else:
+            # patch_owner is not a MultiPauliMeasOp, MeasStabOp, or PrepareOp
+            if isinstance(patch_owner, Operation):
+                msg = f"No side is available for correlation on {patch_owner.name}."
+            else:
+                msg = "No side is available for correlation on block argument."
+            raise ValueError(msg)
+
+        visualisation_data.append(
+            make_correlation_data(
+                side_id,
+                ["X-Z", "X+Z"],
+                [basis],
+            )
+        )
 
 
 @handle_operation.register
@@ -755,6 +767,7 @@ def handle_multi_pauli_measurement(
         }
         logical_sides_result: SidesData = {
             "type": "side",
+            "id": make_side_id(in_logical_patch_id, out_logical_patch_id),
             "op_name": op.name,
             "colourScheme": SideColour.set_colour_scheme(orientation),
             "sides": {
@@ -806,6 +819,7 @@ def handle_multi_pauli_measurement(
         # Add sides
         bridge_sides_result: SidesData = {
             "type": "side",
+            "id": make_side_id(in_bridge_patch_id, out_bridge_patch_id),
             "op_name": op.name,
             "colourScheme": SideColour.set_colour_scheme(orientation),
             "sides": {
@@ -842,7 +856,96 @@ def handle_module_operation(
     # so we can choose to ignore it or handle it as needed.
 
 
-# Pass implementation
+def append_correlation_gap_data(
+    visualisation_data: list[SpaceTimeVisualisationItem],
+) -> None:
+    """Continue vertically connected correlations across gaps at the same footprint."""
+    surfaces = {item["id"]: item for item in visualisation_data if item["type"] == "surface"}
+    sides = {item["id"]: item for item in visualisation_data if item["type"] == "side"}
+    groups: dict[
+        tuple[tuple[float, float], tuple[int, int], SurfaceColour],
+        dict[str, tuple[SurfaceData, SurfaceData, SidesData, CorrelationData]],
+    ] = {}
+    for item in visualisation_data:
+        if item["type"] != "correlation":
+            continue
+        side = sides[item["blockId"]]
+        base = surfaces[side["fromSurfaceId"]]
+        top = surfaces[side["toSurfaceId"]]
+        if base["location"] != top["location"] or base["size"] != top["size"]:
+            continue
+        key = (base["location"], base["size"], item["colour"])
+        groups.setdefault(key, {})[side["id"]] = (base, top, side, item)
+
+    for blocks in groups.values():
+        ordered_blocks = sorted(blocks.values(), key=lambda block: block[0]["startHeight"])
+
+        # Fill gap from prepared patch to first correlation
+        if ordered_blocks:
+            first_base, _, first_side, first_correlation = ordered_blocks[0]
+            if first_base["startHeight"] > 0:
+                # Find prepared patch at this location with height 0
+                location = first_base["location"]
+                size = first_base["size"]
+                prepared_patches = [
+                    surf
+                    for surf in surfaces.values()
+                    if surf.get("location") == location
+                    and surf.get("size") == size
+                    and surf.get("startHeight") == 0
+                    and surf.get("op_name") == "log_asm.prepare"
+                ]
+
+                if prepared_patches:
+                    prepared_patch = prepared_patches[0]
+                    initial_gap_id = make_side_id(prepared_patch["id"], first_base["id"])
+                    initial_gap_side: SidesData = {
+                        "type": "side",
+                        "id": initial_gap_id,
+                        "op_name": "correlation_gap",
+                        "colourScheme": first_side["colourScheme"],
+                        "sides": {"+X": False, "-X": False, "+Y": False, "-Y": False},
+                        "fromSurfaceId": prepared_patch["id"],
+                        "toSurfaceId": first_base["id"],
+                    }
+                    initial_gap_correlation: CorrelationData = {
+                        "type": "correlation",
+                        "blockId": initial_gap_id,
+                        "surfaces": ["X-Z", "X+Z"],
+                        "colour": first_correlation["colour"],
+                    }
+                    visualisation_data.extend((initial_gap_side, initial_gap_correlation))
+
+        # Fill gaps between consecutive correlations
+        for previous, following in pairwise(ordered_blocks):
+            previous_top = previous[1]
+            following_base, _, following_side, following_correlation = following
+            if previous_top["startHeight"] >= following_base["startHeight"]:
+                continue
+            # Check if previous correlation has vertical surfaces
+            if "X+Z" not in previous[3]["surfaces"]:
+                continue
+            # Create gap correlation - use vertical surfaces for continuity
+            # even if the following correlation is purely horizontal
+            gap_id = make_side_id(previous_top["id"], following_base["id"])
+            gap_side: SidesData = {
+                "type": "side",
+                "id": gap_id,
+                "op_name": "correlation_gap",
+                "colourScheme": following_side["colourScheme"],
+                "sides": {"+X": False, "-X": False, "+Y": False, "-Y": False},
+                "fromSurfaceId": previous_top["id"],
+                "toSurfaceId": following_base["id"],
+            }
+            gap_correlation: CorrelationData = {
+                "type": "correlation",
+                "blockId": gap_id,
+                "surfaces": ["X-Z", "X+Z"],
+                "colour": following_correlation["colour"],
+            }
+            visualisation_data.extend((gap_side, gap_correlation))
+
+
 @dataclass(frozen=True)
 class VisualiseSpacetime(ModulePass):
     """Deltakit-visualise pass that walks the AST and collects visualisation data."""
@@ -855,5 +958,6 @@ class VisualiseSpacetime(ModulePass):
 
         for child in op.walk():
             handle_operation(child, visualisation_data)
-        # Store the visualisation_data on the module for later retrieval
+        append_correlation_gap_data(visualisation_data)
+
         op.attributes[VISUALISE_SPACETIME_DATA] = StringAttr(json.dumps(visualisation_data))
