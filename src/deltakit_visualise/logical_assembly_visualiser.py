@@ -14,6 +14,7 @@ from deltakit_compile.dialects.logical_assembly import LogicalAsm
 from deltakit_compile.dialects.plaquette import Plaquette
 from deltakit_compile.dialects.qcore import QCore
 from deltakit_compile.dialects.qstruct import QStruct
+from deltakit_compile.dialects.sobs import Sobs
 from deltakit_compile.frontend.logasm import LogAsmBuilder, LogAsmProgram
 from deltakit_compile.passes.common.pipeline import ConfigurablePipeline
 from deltakit_compile.passes.log_asm_api.pipeline import (
@@ -184,6 +185,7 @@ class LogicalAssemblyVisualiser:
         context.load_dialect(Arith)
         context.load_dialect(QStruct)
         context.load_dialect(QCore)
+        context.load_dialect(Sobs)
         context.load_dialect(Plaquette)
         return context
 

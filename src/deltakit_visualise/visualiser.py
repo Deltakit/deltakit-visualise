@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # The ``type`` discriminators carried by SpaceTimeVisualisationItem.
 # show() uses these to recognise spacetime data.
-_SPACETIME_ITEM_TYPES = frozenset({"surface", "side", "step", "resize", "rotate"})
+_SPACETIME_ITEM_TYPES = frozenset({"surface", "side", "step", "resize", "rotate", "correlation"})
 _PATCH_ITEM_KEYS = frozenset({"round", "qubits", "patches"})
 VisualisationItem = SpaceTimeVisualisationItem | PatchVisualisationItem
 
