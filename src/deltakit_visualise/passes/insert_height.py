@@ -15,6 +15,7 @@ from deltakit_compile.dialects.logical_assembly import (
     GrowOp,
     MeasStabOp,
     MeasureOp,
+    MoveOp,
     MultiPauliMeasOp,
     PatchDeclarationOp,
     PrepareOp,
@@ -24,10 +25,11 @@ from deltakit_compile.dialects.logical_assembly import (
 )
 from deltakit_compile.dialects.qstruct import ParallelOp
 from xdsl.dialects.builtin import Float64Type, FloatAttr, ModuleOp
-from xdsl.ir import Operation
+from xdsl.ir import Operation, OpResult
 from xdsl.passes import ModulePass
 
 from deltakit_visualise.constants import END_HEIGHT_ATTR, START_HEIGHT_ATTR
+from deltakit_visualise.utils.ssa import unwrap_parallel_value
 
 DEFAULT_HEIGHT_COST: float = 0.0
 
@@ -155,6 +157,21 @@ def handle_rotate_height(op: RotateOp, tracker: HeightTracker) -> None:
     start, end = tracker.consume(op.rounds.data)
     op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
     op.attributes[END_HEIGHT_ATTR] = FloatAttr(end, Float64Type())
+
+
+@insert_height.register
+def handle_move_height(op: MoveOp, tracker: HeightTracker) -> None:
+    """MoveOp occupies *rounds* height units."""
+    start, end = tracker.consume(op.rounds.data)
+    op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
+    op.attributes[END_HEIGHT_ATTR] = FloatAttr(end, Float64Type())
+
+    # Update the start and end heights for any bridge patches associated with the move operation
+    for bridge in op.bridge_patches:
+        bridge_value = unwrap_parallel_value(bridge)
+        if isinstance(bridge_value, OpResult) and isinstance(bridge_value.op, PrepareOp):
+            bridge_value.op.attributes[START_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
+            bridge_value.op.attributes[END_HEIGHT_ATTR] = FloatAttr(start, Float64Type())
 
 
 @insert_height.register

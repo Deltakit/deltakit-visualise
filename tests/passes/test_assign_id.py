@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 from deltakit_compile.dialects.logical_assembly import (
     MeasStabOp,
+    MoveOp,
     OrientationEnum,
     PlacementAttr,
     RotatedPlanarPatchType,
@@ -20,6 +21,7 @@ from deltakit_visualise.constants import (
     IN_BRIDGE_PATCHES_ID,
     IN_LOGICAL_PATCHES_ID,
     IN_OP_ID,
+    MOVE_BRIDGE_PATCHES_ID,
     OUT_BRIDGE_PATCHES_ID,
     OUT_LOGICAL_PATCHES_ID,
     OUT_OP_ID,
@@ -425,6 +427,32 @@ class TestAssignIdRotate:
         assert in_id
         assert out_id
         assert in_id != out_id
+
+
+class TestAssignIdMove:
+    """Tests for AssignId pass with MoveOp."""
+
+    def test_move_assigns_patch_and_bridge_ids(self) -> None:
+        """MoveOp receives non-empty IDs for its endpoints and bridge path."""
+        patch_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([0, 0], OrientationEnum.VERTICAL_Z)
+        )
+        bridge_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([3, 0], OrientationEnum.VERTICAL_Z)
+        )
+        destination_type = RotatedPlanarPatchType(
+            make_size(3, 3), PlacementAttr([6, 0], OrientationEnum.VERTICAL_Z)
+        )
+        patch, bridge = test.TestOp(result_types=[patch_type, bridge_type]).res
+        move = MoveOp(patch, 4, [bridge], destination_type)
+
+        AssignId().apply(None, ModuleOp([move]))
+
+        bridge_ids = _get_id_list(move, MOVE_BRIDGE_PATCHES_ID)
+        assert _get_in_id(move)
+        assert _get_out_id(move)
+        assert len(bridge_ids) == 1
+        assert bridge_ids[0]
 
 
 class TestAssignIdConsecutiveMeasStab:

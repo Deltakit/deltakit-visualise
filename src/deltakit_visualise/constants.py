@@ -62,6 +62,7 @@ IN_LOGICAL_PATCHES_ID: Final[str] = "visualise.multi_pauli_meas.logical_patches.
 OUT_LOGICAL_PATCHES_ID: Final[str] = "visualise.multi_pauli_meas.logical_patches.out.id"
 IN_BRIDGE_PATCHES_ID: Final[str] = "visualise.multi_pauli_meas.bridge_patches.in.id"
 OUT_BRIDGE_PATCHES_ID: Final[str] = "visualise.multi_pauli_meas.bridge_patches.out.id"
+MOVE_BRIDGE_PATCHES_ID: Final[str] = "visualise.move.bridge_patches.id"
 
 # Allowed origins for CORS in the FastAPI server, update to include any additional origins as needed
 ALLOWED_ORIGINS: Final[list[str]] = [f"http://localhost:{port_no}" for port_no in range(5173, 5179)]
